@@ -1,0 +1,33 @@
+```json
+{
+  "manifest_version": 3,
+  "name": "JoqniX Cookie Sync",
+  "version": "0.1.0",
+  "description": "Automatically sync selected browser cookies for JoqniX services.",
+  "permissions": [
+    "cookies",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://youtube.com/*",
+    "https://*.twitch.tv/*",
+    "https://twitch.tv/*",
+    "https://*.kick.com/*",
+    "https://kick.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "JoqniX Cookie Sync",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+```
