@@ -9,6 +9,12 @@ const SUPPORTED_DOMAINS = [
   "kick.com"
 ];
 
+const COOKIE_ALLOWLIST = {
+  youtube: [],
+  twitch: [],
+  kick: []
+};
+
 /**
  * Check whether a cookie belongs to one of our supported domains.
  */
