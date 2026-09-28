@@ -5,6 +5,7 @@
 const SUPPORTED_DOMAINS = [
   "youtube.com",
   "twitch.tv",
+  "google.com",
   "kick.com"
 ];
 
