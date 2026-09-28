@@ -1,141 +1,281 @@
 // JoqniX Cookie Sync
 // Background Service Worker
-// Version: 0.2.0
+// Version: 0.4.0
+
+
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
 
 const SUPPORTED_DOMAINS = [
   "youtube.com",
-  "twitch.tv",
   "google.com",
+  "twitch.tv",
   "kick.com"
 ];
 
-/**
- * Check whether a cookie belongs to one of our supported domains.
+
+const DEFAULT_CONFIG = {
+  workerUrl:
+    "https://api.joqnix.space/cookies",
+
+  syncAutomatically:
+    false
+};
+
+
+/*
+ * Automatic sync settings.
+ *
+ * The cookie-change listener uses a short debounce.
+ * The alarm provides a periodic backup sync in case
+ * cookies changed while the service worker was inactive.
  */
+
+const AUTOMATIC_SYNC_ALARM =
+  "joqnix-cookie-sync";
+
+const AUTOMATIC_SYNC_PERIOD_MINUTES =
+  30;
+
+const COOKIE_CHANGE_DEBOUNCE_MS =
+  5000;
+
+
+let syncTimer = null;
+
+
+/* =========================================================
+   DOMAIN HELPERS
+   ========================================================= */
+
+function normalizeDomain(domain) {
+
+  if (
+    typeof domain !==
+    "string"
+  ) {
+    return "";
+  }
+
+
+  return domain
+    .replace(
+      /^\./,
+      ""
+    )
+    .toLowerCase();
+}
+
+
 function isSupportedCookie(cookie) {
-  const domain = cookie.domain.replace(/^\./, "").toLowerCase();
+
+  if (
+    !cookie ||
+    typeof cookie.domain !==
+      "string"
+  ) {
+    return false;
+  }
+
+
+  const domain =
+    normalizeDomain(
+      cookie.domain
+    );
+
 
   return SUPPORTED_DOMAINS.some(
     supportedDomain =>
-      domain === supportedDomain ||
-      domain.endsWith(`.${supportedDomain}`)
+      domain ===
+        supportedDomain ||
+      domain.endsWith(
+        `.${supportedDomain}`
+      )
   );
 }
 
-/**
- * Determine which supported service a cookie belongs to.
- */
+
 function getCookieService(cookie) {
-  const domain = cookie.domain
-    .replace(/^\./, "")
-    .toLowerCase();
+
+  if (
+    !cookie ||
+    typeof cookie.domain !==
+      "string"
+  ) {
+    return null;
+  }
+
+
+  const domain =
+    normalizeDomain(
+      cookie.domain
+    );
+
 
   return SUPPORTED_DOMAINS.find(
     supportedDomain =>
-      domain === supportedDomain ||
-      domain.endsWith(`.${supportedDomain}`)
+      domain ===
+        supportedDomain ||
+      domain.endsWith(
+        `.${supportedDomain}`
+      )
   ) || null;
 }
 
-/**
- * Get every cookie accessible to the extension,
- * then keep only cookies belonging to our supported domains.
- *
- * We intentionally retrieve the complete cookie jar here
- * because the goal is to reproduce the full Netscape
- * cookie export for each supported service.
- */
-async function getSupportedCookies() {
-  try {
-    const cookies = await chrome.cookies.getAll({});
 
-    return cookies.filter(isSupportedCookie);
+/* =========================================================
+   COOKIE COLLECTION
+   ========================================================= */
+
+/**
+ * Get the COMPLETE browser cookie jar accessible
+ * to the extension.
+ *
+ * There is intentionally NO cookie-name allowlist.
+ *
+ * We collect every accessible cookie belonging to:
+ *
+ * - youtube.com
+ * - google.com
+ * - twitch.tv
+ * - kick.com
+ *
+ * This includes supported subdomains.
+ */
+
+async function getSupportedCookies() {
+
+  try {
+
+    const cookies =
+      await chrome.cookies.getAll({});
+
+
+    return cookies.filter(
+      isSupportedCookie
+    );
+
+
   } catch (error) {
+
     console.error(
       "[Cookie Sync] Failed to read browser cookies:",
       error
     );
 
+
     throw error;
   }
 }
 
-/**
- * Create a safe structured representation of a Chrome cookie.
- *
- * This is kept for compatibility with popup.js and for
- * debugging. The Netscape representation is generated separately.
- */
+
+/* =========================================================
+   STRUCTURED COOKIE SERIALIZATION
+   ========================================================= */
+
 function serializeCookie(cookie) {
+
   return {
-    name: cookie.name,
-    value: cookie.value,
-    domain: cookie.domain,
-    path: cookie.path,
-    secure: cookie.secure,
-    httpOnly: cookie.httpOnly,
-    sameSite: cookie.sameSite,
-    expirationDate: cookie.expirationDate ?? null,
-    session: cookie.session
+
+    name:
+      cookie.name,
+
+    value:
+      cookie.value,
+
+    domain:
+      cookie.domain,
+
+    path:
+      cookie.path,
+
+    secure:
+      cookie.secure,
+
+    httpOnly:
+      cookie.httpOnly,
+
+    sameSite:
+      cookie.sameSite,
+
+    expirationDate:
+      cookie.expirationDate ??
+      null,
+
+    session:
+      cookie.session,
+
+    hostOnly:
+      !cookie.domain.startsWith(".")
   };
 }
 
-/**
- * Convert one Chrome cookie into Netscape HTTP Cookie format.
- *
- * Netscape format:
- *
- * domain
- * includeSubdomains
- * path
- * secure
- * expiration
- * name
- * value
- *
- * HttpOnly cookies use:
- *
- * #HttpOnly_<domain>
- */
-function cookieToNetscape(cookie) {
-  let domain = cookie.domain;
 
-  /**
-   * Netscape cookie files represent HttpOnly cookies
-   * by adding #HttpOnly_ before the domain.
+/* =========================================================
+   NETSCAPE EXPORT
+   ========================================================= */
+
+function cookieToNetscape(cookie) {
+
+  let domain =
+    cookie.domain;
+
+
+  /*
+   * Netscape cookie files represent
+   * HttpOnly cookies using:
+   *
+   * #HttpOnly_<domain>
    */
+
   if (cookie.httpOnly) {
-    domain = `#HttpOnly_${domain}`;
+
+    domain =
+      `#HttpOnly_${domain}`;
   }
 
-  /**
-   * The Netscape domain flag indicates whether the cookie
-   * applies to subdomains.
-   *
-   * Chrome preserves this through the leading dot on
-   * domain cookies.
+
+  /*
+   * Chrome normally exposes a leading dot
+   * for domain cookies.
    */
-  const includeSubdomains = cookie.domain.startsWith(".")
-    ? "TRUE"
-    : "FALSE";
 
-  const path = cookie.path || "/";
+  const includeSubdomains =
+    cookie.domain.startsWith(".")
+      ? "TRUE"
+      : "FALSE";
 
-  const secure = cookie.secure
-    ? "TRUE"
-    : "FALSE";
 
-  /**
-   * Session cookies have no expiration timestamp.
-   *
-   * Netscape cookie files use 0 for these.
+  const path =
+    cookie.path || "/";
+
+
+  const secure =
+    cookie.secure
+      ? "TRUE"
+      : "FALSE";
+
+
+  /*
+   * Session cookies use expiration 0.
    */
-  const expiration = cookie.session
-    ? "0"
-    : Math.floor(cookie.expirationDate || 0);
 
-  const name = cookie.name || "";
-  const value = cookie.value || "";
+  const expiration =
+    cookie.session
+      ? "0"
+      : Math.floor(
+          cookie.expirationDate || 0
+        );
+
+
+  const name =
+    cookie.name || "";
+
+
+  const value =
+    cookie.value || "";
+
 
   return [
     domain,
@@ -148,341 +288,1550 @@ function cookieToNetscape(cookie) {
   ].join("\t");
 }
 
-/**
- * Convert cookies into a complete Netscape Cookie File.
- */
-function cookiesToNetscape(cookies, domainName) {
+
+function cookiesToNetscape(
+  cookies,
+  domainName
+) {
+
   const header = [
+
     "# Netscape HTTP Cookie File",
+
     "# This file was generated by JoqniX Cookie Sync",
+
     `# Domain: ${domainName}`,
+
     ""
+
   ].join("\n");
 
-  /**
-   * Sort cookies for stable output.
-   *
-   * This makes comparing old and new exports much easier.
+
+  /*
+   * Stable ordering makes exports
+   * easier to compare.
    */
-  const sortedCookies = [...cookies].sort((a, b) => {
-    const domainCompare =
-      a.domain.localeCompare(b.domain);
 
-    if (domainCompare !== 0) {
-      return domainCompare;
-    }
+  const sortedCookies =
+    [...cookies].sort(
+      (a, b) => {
 
-    const pathCompare =
-      a.path.localeCompare(b.path);
+        const domainCompare =
+          a.domain.localeCompare(
+            b.domain
+          );
 
-    if (pathCompare !== 0) {
-      return pathCompare;
-    }
 
-    return a.name.localeCompare(b.name);
-  });
+        if (
+          domainCompare !== 0
+        ) {
+          return domainCompare;
+        }
 
-  const lines = sortedCookies.map(cookieToNetscape);
 
-  return `${header}\n${lines.join("\n")}\n`;
+        const pathCompare =
+          a.path.localeCompare(
+            b.path
+          );
+
+
+        if (
+          pathCompare !== 0
+        ) {
+          return pathCompare;
+        }
+
+
+        return a.name.localeCompare(
+          b.name
+        );
+      }
+    );
+
+
+  const lines =
+    sortedCookies.map(
+      cookieToNetscape
+    );
+
+
+  return (
+    `${header}\n` +
+    `${lines.join("\n")}\n`
+  );
 }
 
-/**
- * Generate Netscape Cookie Files for every supported service.
- */
-function generateNetscapeFiles(cookies) {
+
+function generateNetscapeFiles(
+  cookies
+) {
+
   const files = {};
 
-  for (const domain of SUPPORTED_DOMAINS) {
-    const domainCookies = cookies.filter(
-      cookie =>
-        getCookieService(cookie) === domain
-    );
 
-    files[domain] = cookiesToNetscape(
-      domainCookies,
-      domain
-    );
+  for (
+    const domain
+    of SUPPORTED_DOMAINS
+  ) {
+
+    const domainCookies =
+      cookies.filter(
+        cookie =>
+          getCookieService(
+            cookie
+          ) === domain
+      );
+
+
+    files[domain] =
+      cookiesToNetscape(
+        domainCookies,
+        domain
+      );
   }
+
 
   return files;
 }
 
-/**
- * Save the complete cookie snapshot and Netscape exports
- * locally using chrome.storage.local.
- */
-async function saveCookieSnapshot() {
-  try {
-    const cookies = await getSupportedCookies();
 
-    const snapshot = cookies.map(serializeCookie);
+/* =========================================================
+   COOKIE COUNTS
+   ========================================================= */
 
-    const netscapeFiles =
-      generateNetscapeFiles(cookies);
+function generateCookieCounts(
+  cookies
+) {
 
-    const cookieCounts = {};
+  const counts = {};
 
-    for (const domain of SUPPORTED_DOMAINS) {
-      cookieCounts[domain] = cookies.filter(
+
+  for (
+    const domain
+    of SUPPORTED_DOMAINS
+  ) {
+
+    counts[domain] =
+      cookies.filter(
         cookie =>
-          getCookieService(cookie) === domain
+          getCookieService(
+            cookie
+          ) === domain
       ).length;
-    }
-
-    const timestamp = Date.now();
-
-    await chrome.storage.local.set({
-      cookieSnapshot: snapshot,
-      netscapeFiles,
-      cookieCounts,
-      lastLocalSync: timestamp
-    });
-
-    console.log(
-      `[Cookie Sync] Local snapshot updated: ${snapshot.length} cookies`
-    );
-
-    console.log(
-      "[Cookie Sync] Cookie counts:",
-      cookieCounts
-    );
-
-    return {
-      cookies,
-      snapshot,
-      netscapeFiles,
-      cookieCounts,
-      timestamp
-    };
-
-  } catch (error) {
-    console.error(
-      "[Cookie Sync] Failed to save cookie snapshot:",
-      error
-    );
-
-    throw error;
   }
+
+
+  return counts;
 }
 
-/**
- * Handle cookie changes.
- *
- * Any relevant cookie change causes the complete local
- * Netscape snapshots to be rebuilt.
- */
-chrome.cookies.onChanged.addListener(async changeInfo => {
-  const cookie = changeInfo.cookie;
 
-  if (!isSupportedCookie(cookie)) {
+/* =========================================================
+   SNAPSHOT CREATION
+   ========================================================= */
+
+async function buildSnapshot() {
+
+  const cookies =
+    await getSupportedCookies();
+
+
+  /*
+   * Keep the complete browser cookie
+   * representation.
+   */
+
+  const serializedCookies =
+    cookies.map(
+      serializeCookie
+    );
+
+
+  /*
+   * Generate Netscape representations
+   * separately for compatibility.
+   */
+
+  const netscapeFiles =
+    generateNetscapeFiles(
+      cookies
+    );
+
+
+  const cookieCounts =
+    generateCookieCounts(
+      cookies
+    );
+
+
+  return {
+
+    cookies:
+      serializedCookies,
+
+    netscapeFiles,
+
+    cookieCounts,
+
+    totalCookies:
+      serializedCookies.length,
+
+    timestamp:
+      Date.now()
+
+  };
+}
+
+
+/* =========================================================
+   LOCAL STORAGE
+   ========================================================= */
+
+async function saveCookieSnapshot() {
+
+  const snapshot =
+    await buildSnapshot();
+
+
+  await chrome.storage.local.set({
+
+    cookieSnapshot:
+      snapshot.cookies,
+
+    netscapeFiles:
+      snapshot.netscapeFiles,
+
+    cookieCounts:
+      snapshot.cookieCounts,
+
+    totalCookies:
+      snapshot.totalCookies,
+
+    lastLocalSync:
+      snapshot.timestamp
+
+  });
+
+
+  console.log(
+    `[Cookie Sync] Local snapshot updated: ${snapshot.totalCookies} cookies`
+  );
+
+
+  return snapshot;
+}
+
+
+/* =========================================================
+   CLOUDFLARE CONFIGURATION
+   ========================================================= */
+
+async function getConfig() {
+
+  const data =
+    await chrome.storage.local.get([
+      "workerUrl",
+      "workerToken",
+      "syncAutomatically"
+    ]);
+
+
+  return {
+
+    workerUrl:
+      data.workerUrl ||
+      DEFAULT_CONFIG.workerUrl,
+
+    workerToken:
+      data.workerToken ||
+      "",
+
+    syncAutomatically:
+      data.syncAutomatically ??
+      DEFAULT_CONFIG.syncAutomatically
+
+  };
+}
+
+
+/* =========================================================
+   CLOUDFLARE HEALTH CHECK
+   ========================================================= */
+
+async function checkCloudflareHealth() {
+
+  const config =
+    await getConfig();
+
+
+  if (!config.workerUrl) {
+
+    throw new Error(
+      "Cloudflare Worker URL is not configured."
+    );
+  }
+
+
+  if (!config.workerToken) {
+
+    throw new Error(
+      "Cloudflare sync token is not configured."
+    );
+  }
+
+
+  const healthUrl =
+    config.workerUrl
+      .replace(
+        /\/+$/,
+        ""
+      ) +
+      "/health";
+
+
+  const response =
+    await fetch(
+      healthUrl,
+      {
+
+        method:
+          "GET",
+
+        headers: {
+
+          "Authorization":
+            `Bearer ${config.workerToken}`
+
+        }
+
+      }
+    );
+
+
+  if (!response.ok) {
+
+    const text =
+      await response.text();
+
+
+    throw new Error(
+      `Cloudflare health check failed (${response.status}): ${text}`
+    );
+  }
+
+
+  const result =
+    await response.json();
+
+
+  return result;
+}
+
+
+/* =========================================================
+   CLOUDFLARE SYNC
+   ========================================================= */
+
+async function syncToCloudflare() {
+
+  const config =
+    await getConfig();
+
+
+  if (!config.workerUrl) {
+
+    throw new Error(
+      "Cloudflare Worker URL is not configured."
+    );
+  }
+
+
+  if (!config.workerToken) {
+
+    throw new Error(
+      "Cloudflare sync token is not configured."
+    );
+  }
+
+
+  /*
+   * Always build a fresh complete snapshot
+   * immediately before uploading.
+   */
+
+  const snapshot =
+    await buildSnapshot();
+
+
+  const payload = {
+
+    version:
+      1,
+
+    source:
+      "joqnix-cookie-sync",
+
+    timestamp:
+      snapshot.timestamp,
+
+    totalCookies:
+      snapshot.totalCookies,
+
+    cookieCounts:
+      snapshot.cookieCounts,
+
+    /*
+     * COMPLETE structured browser cookies.
+     */
+
+    cookies:
+      snapshot.cookies,
+
+    /*
+     * COMPLETE Netscape representations.
+     */
+
+    netscapeFiles:
+      snapshot.netscapeFiles
+
+  };
+
+
+  const response =
+    await fetch(
+      config.workerUrl,
+      {
+
+        method:
+          "POST",
+
+        headers: {
+
+          "Content-Type":
+            "application/json",
+
+          "Authorization":
+            `Bearer ${config.workerToken}`
+
+        },
+
+        body:
+          JSON.stringify(
+            payload
+          )
+
+      }
+    );
+
+
+  if (!response.ok) {
+
+    const text =
+      await response.text();
+
+
+    throw new Error(
+      `Cloudflare sync failed (${response.status}): ${text}`
+    );
+  }
+
+
+  const result =
+    await response.json();
+
+
+  await chrome.storage.local.set({
+
+    lastCloudSync:
+      snapshot.timestamp,
+
+    lastCloudSyncResult:
+      result
+
+  });
+
+
+  console.log(
+    "[Cookie Sync] Cloudflare sync completed."
+  );
+
+
+  return {
+
+    snapshot,
+
+    result
+
+  };
+}
+
+
+/* =========================================================
+   AUTOMATIC SYNC
+   ========================================================= */
+
+/**
+ * Configure the periodic Chrome alarm.
+ *
+ * The alarm survives service-worker suspension and
+ * browser restarts better than setTimeout().
+ */
+
+async function configureAutomaticSyncAlarm() {
+
+  const config =
+    await getConfig();
+
+
+  await chrome.alarms.clear(
+    AUTOMATIC_SYNC_ALARM
+  );
+
+
+  if (
+    !config.syncAutomatically
+  ) {
+
     return;
   }
 
-  console.log("[Cookie Sync] Cookie changed:", {
-    cause: changeInfo.cause,
-    removed: changeInfo.removed,
-    name: cookie.name,
-    domain: cookie.domain,
-    path: cookie.path
-  });
 
-  try {
-    await saveCookieSnapshot();
-  } catch (error) {
-    console.error(
-      "[Cookie Sync] Failed to update after cookie change:",
-      error
-    );
-  }
-});
+  chrome.alarms.create(
+    AUTOMATIC_SYNC_ALARM,
+    {
+      periodInMinutes:
+        AUTOMATIC_SYNC_PERIOD_MINUTES
+    }
+  );
+
+
+  console.log(
+    `[Cookie Sync] Automatic sync alarm enabled (${AUTOMATIC_SYNC_PERIOD_MINUTES} minutes).`
+  );
+}
+
 
 /**
- * Messages from popup.js or other extension pages.
+ * Debounce cookie-triggered cloud synchronization.
+ *
+ * Cookie changes can happen in bursts.
+ * We wait 5 seconds after the latest change.
  */
-chrome.runtime.onMessage.addListener(
-  (message, sender, sendResponse) => {
+
+function scheduleAutomaticCloudSync() {
+
+  if (syncTimer) {
+
+    clearTimeout(
+      syncTimer
+    );
+  }
+
+
+  syncTimer =
+    setTimeout(
+      async () => {
+
+        syncTimer = null;
+
+
+        try {
+
+          const config =
+            await getConfig();
+
+
+          if (
+            !config.syncAutomatically
+          ) {
+            return;
+          }
+
+
+          await syncToCloudflare();
+
+
+        } catch (error) {
+
+          console.error(
+            "[Cookie Sync] Automatic cloud sync failed:",
+            error
+          );
+        }
+
+      },
+
+      COOKIE_CHANGE_DEBOUNCE_MS
+    );
+}
+
+
+/* =========================================================
+   ALARM HANDLER
+   ========================================================= */
+
+chrome.alarms.onAlarm.addListener(
+  async alarm => {
 
     if (
-      !message ||
-      typeof message.type !== "string"
+      alarm.name !==
+      AUTOMATIC_SYNC_ALARM
     ) {
       return;
     }
 
-    /**
-     * Return all structured cookies.
-     *
-     * Existing popup.js uses this.
-     */
-    if (message.type === "GET_COOKIES") {
-      getSupportedCookies()
-        .then(cookies => {
-          sendResponse({
-            success: true,
-            cookies: cookies.map(serializeCookie)
-          });
-        })
-        .catch(error => {
-          sendResponse({
-            success: false,
-            error: error.message
-          });
-        });
 
-      return true;
-    }
+    try {
 
-    /**
-     * Rebuild the complete local snapshot.
-     */
-    if (message.type === "SYNC_LOCAL") {
-      saveCookieSnapshot()
-        .then(result => {
-          sendResponse({
-            success: true,
-            count: result.snapshot.length,
-            cookieCounts: result.cookieCounts,
-            timestamp: result.timestamp
-          });
-        })
-        .catch(error => {
-          sendResponse({
-            success: false,
-            error: error.message
-          });
-        });
+      const config =
+        await getConfig();
 
-      return true;
-    }
 
-    /**
-     * Return current extension status.
-     */
-    if (message.type === "GET_STATUS") {
-      chrome.storage.local
-        .get([
-          "cookieSnapshot",
-          "cookieCounts",
-          "lastLocalSync"
-        ])
-        .then(data => {
-          sendResponse({
-            success: true,
-            cookieCount:
-              data.cookieSnapshot?.length ?? 0,
+      if (
+        !config.syncAutomatically
+      ) {
+        await chrome.alarms.clear(
+          AUTOMATIC_SYNC_ALARM
+        );
 
-            cookieCounts:
-              data.cookieCounts ?? {},
+        return;
+      }
 
-            lastLocalSync:
-              data.lastLocalSync ?? null
-          });
-        })
-        .catch(error => {
-          sendResponse({
-            success: false,
-            error: error.message
-          });
-        });
 
-      return true;
-    }
+      await syncToCloudflare();
 
-    /**
-     * Return the generated Netscape Cookie Files.
-     */
-    if (message.type === "GET_NETSCAPE") {
-      chrome.storage.local
-        .get([
-          "netscapeFiles",
-          "lastLocalSync"
-        ])
-        .then(async data => {
 
-          /**
-           * If no Netscape snapshot exists yet,
-           * generate one immediately.
-           */
-          if (!data.netscapeFiles) {
-            const result =
-              await saveCookieSnapshot();
+    } catch (error) {
 
-            sendResponse({
-              success: true,
-              files: result.netscapeFiles,
-              timestamp: result.timestamp
-            });
-
-            return;
-          }
-
-          sendResponse({
-            success: true,
-            files: data.netscapeFiles,
-            timestamp:
-              data.lastLocalSync ?? null
-          });
-        })
-        .catch(error => {
-          sendResponse({
-            success: false,
-            error: error.message
-          });
-        });
-
-      return true;
-    }
-
-    /**
-     * Return the complete current Netscape exports
-     * directly from the browser cookie store.
-     */
-    if (message.type === "EXPORT_NETSCAPE") {
-      getSupportedCookies()
-        .then(cookies => {
-          const files =
-            generateNetscapeFiles(cookies);
-
-          sendResponse({
-            success: true,
-            files,
-            cookieCount: cookies.length
-          });
-        })
-        .catch(error => {
-          sendResponse({
-            success: false,
-            error: error.message
-          });
-        });
-
-      return true;
+      console.error(
+        "[Cookie Sync] Scheduled cloud sync failed:",
+        error
+      );
     }
   }
 );
 
-/**
- * Initialize the local snapshot when the extension starts.
- */
-chrome.runtime.onStartup.addListener(async () => {
-  console.log(
-    "[Cookie Sync] Extension startup"
-  );
 
-  try {
-    await saveCookieSnapshot();
-  } catch (error) {
-    console.error(
-      "[Cookie Sync] Startup sync failed:",
-      error
+/* =========================================================
+   COOKIE CHANGE HANDLER
+   ========================================================= */
+
+chrome.cookies.onChanged.addListener(
+  async changeInfo => {
+
+    const cookie =
+      changeInfo.cookie;
+
+
+    if (
+      !isSupportedCookie(
+        cookie
+      )
+    ) {
+      return;
+    }
+
+
+    /*
+     * Never log cookie values.
+     */
+
+    console.log(
+      "[Cookie Sync] Supported cookie changed:",
+      {
+
+        cause:
+          changeInfo.cause,
+
+        removed:
+          changeInfo.removed,
+
+        name:
+          cookie.name,
+
+        domain:
+          cookie.domain,
+
+        path:
+          cookie.path
+
+      }
     );
-  }
-});
 
-/**
- * Initialize when the extension is installed or updated.
- */
+
+    try {
+
+      /*
+       * Always update local state.
+       */
+
+      await saveCookieSnapshot();
+
+
+      /*
+       * Cloud sync only happens when
+       * automatic sync is enabled.
+       */
+
+      const config =
+        await getConfig();
+
+
+      if (
+        config.syncAutomatically
+      ) {
+
+        scheduleAutomaticCloudSync();
+      }
+
+
+    } catch (error) {
+
+      console.error(
+        "[Cookie Sync] Cookie change processing failed:",
+        error
+      );
+    }
+
+  }
+);
+
+
+/* =========================================================
+   MESSAGE API
+   ========================================================= */
+
+chrome.runtime.onMessage.addListener(
+  (
+    message,
+    sender,
+    sendResponse
+  ) => {
+
+
+    if (
+      !message ||
+      typeof message.type !==
+        "string"
+    ) {
+      return;
+    }
+
+
+    /* =====================================================
+       GET COOKIES
+       ===================================================== */
+
+    if (
+      message.type ===
+      "GET_COOKIES"
+    ) {
+
+      getSupportedCookies()
+
+        .then(cookies => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            cookies:
+              cookies.map(
+                serializeCookie
+              )
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SYNC LOCAL
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SYNC_LOCAL"
+    ) {
+
+      saveCookieSnapshot()
+
+        .then(snapshot => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            count:
+              snapshot.totalCookies,
+
+            cookieCounts:
+              snapshot.cookieCounts,
+
+            timestamp:
+              snapshot.timestamp
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       GET STATUS
+       ===================================================== */
+
+    if (
+      message.type ===
+      "GET_STATUS"
+    ) {
+
+      chrome.storage.local
+        .get([
+
+          "cookieSnapshot",
+
+          "cookieCounts",
+
+          "totalCookies",
+
+          "lastLocalSync",
+
+          "lastCloudSync",
+
+          "lastCloudSyncResult",
+
+          "syncAutomatically"
+
+        ])
+
+        .then(data => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            cookieCount:
+              data.totalCookies ??
+              data.cookieSnapshot?.length ??
+              0,
+
+            cookieCounts:
+              data.cookieCounts ??
+              {},
+
+            lastLocalSync:
+              data.lastLocalSync ??
+              null,
+
+            lastCloudSync:
+              data.lastCloudSync ??
+              null,
+
+            lastCloudSyncResult:
+              data.lastCloudSyncResult ??
+              null,
+
+            syncAutomatically:
+              data.syncAutomatically ??
+              false
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       GET NETSCAPE
+       ===================================================== */
+
+    if (
+      message.type ===
+      "GET_NETSCAPE"
+    ) {
+
+      chrome.storage.local
+        .get([
+
+          "netscapeFiles",
+
+          "lastLocalSync"
+
+        ])
+
+        .then(
+          async data => {
+
+            if (
+              !data.netscapeFiles
+            ) {
+
+              const snapshot =
+                await saveCookieSnapshot();
+
+
+              sendResponse({
+
+                success:
+                  true,
+
+                files:
+                  snapshot.netscapeFiles,
+
+                timestamp:
+                  snapshot.timestamp
+
+              });
+
+
+              return;
+            }
+
+
+            sendResponse({
+
+              success:
+                true,
+
+              files:
+                data.netscapeFiles,
+
+              timestamp:
+                data.lastLocalSync ??
+                null
+
+            });
+
+          }
+        )
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       EXPORT NETSCAPE
+       ===================================================== */
+
+    if (
+      message.type ===
+      "EXPORT_NETSCAPE"
+    ) {
+
+      getSupportedCookies()
+
+        .then(cookies => {
+
+          const files =
+            generateNetscapeFiles(
+              cookies
+            );
+
+
+          sendResponse({
+
+            success:
+              true,
+
+            files,
+
+            cookieCount:
+              cookies.length
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SYNC TO CLOUDFLARE
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SYNC_CLOUD"
+    ) {
+
+      syncToCloudflare()
+
+        .then(result => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            count:
+              result.snapshot
+                .totalCookies,
+
+            cookieCounts:
+              result.snapshot
+                .cookieCounts,
+
+            timestamp:
+              result.snapshot
+                .timestamp,
+
+            result:
+              result.result
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       CHECK CLOUDFLARE HEALTH
+       ===================================================== */
+
+    if (
+      message.type ===
+      "CHECK_CLOUDFLARE_HEALTH"
+    ) {
+
+      checkCloudflareHealth()
+
+        .then(result => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            result
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       GET CONFIG
+       ===================================================== */
+
+    if (
+      message.type ===
+      "GET_CONFIG"
+    ) {
+
+      getConfig()
+
+        .then(config => {
+
+          sendResponse({
+
+            success:
+              true,
+
+            workerUrl:
+              config.workerUrl,
+
+            hasToken:
+              Boolean(
+                config.workerToken
+              ),
+
+            syncAutomatically:
+              config.syncAutomatically
+
+          });
+
+        })
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SAVE CONFIG
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SAVE_CONFIG"
+    ) {
+
+      chrome.storage.local
+        .get([
+
+          "workerUrl",
+
+          "workerToken",
+
+          "syncAutomatically"
+
+        ])
+
+        .then(
+          async existing => {
+
+            /*
+             * Preserve existing values when
+             * the popup intentionally leaves
+             * a field unchanged.
+             */
+
+            const workerUrl =
+              typeof message.workerUrl ===
+                "string" &&
+              message.workerUrl.trim()
+                ? message.workerUrl.trim()
+                : (
+                    existing.workerUrl ||
+                    DEFAULT_CONFIG.workerUrl
+                  );
+
+
+            const workerToken =
+              typeof message.workerToken ===
+                "string" &&
+              message.workerToken.trim()
+                ? message.workerToken.trim()
+                : (
+                    existing.workerToken ||
+                    ""
+                  );
+
+
+            const syncAutomatically =
+              typeof message.syncAutomatically ===
+                "boolean"
+                ? message.syncAutomatically
+                : (
+                    existing.syncAutomatically ??
+                    DEFAULT_CONFIG.syncAutomatically
+                  );
+
+
+            await chrome.storage.local.set({
+
+              workerUrl,
+
+              workerToken,
+
+              syncAutomatically
+
+            });
+
+
+            /*
+             * Keep the Chrome alarm synchronized
+             * with the newly saved setting.
+             */
+
+            await configureAutomaticSyncAlarm();
+
+
+            sendResponse({
+
+              success:
+                true,
+
+              workerUrl,
+
+              hasToken:
+                Boolean(
+                  workerToken
+                ),
+
+              syncAutomatically
+
+            });
+
+          }
+        )
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SET AUTOMATIC SYNC
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SET_AUTOMATIC_SYNC"
+    ) {
+
+      const enabled =
+        Boolean(
+          message.enabled
+        );
+
+
+      chrome.storage.local
+        .set({
+
+          syncAutomatically:
+            enabled
+
+        })
+
+        .then(
+          async () => {
+
+            await configureAutomaticSyncAlarm();
+
+
+            sendResponse({
+
+              success:
+                true,
+
+              syncAutomatically:
+                enabled
+
+            });
+
+          }
+        )
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       DOWNLOAD NETSCAPE
+       ===================================================== */
+
+    if (
+      message.type ===
+      "DOWNLOAD_NETSCAPE"
+    ) {
+
+      const service =
+        message.service;
+
+
+      if (
+        !SUPPORTED_DOMAINS.includes(
+          service
+        )
+      ) {
+
+        sendResponse({
+
+          success:
+            false,
+
+          error:
+            "Unsupported cookie service."
+
+        });
+
+
+        return true;
+      }
+
+
+      chrome.storage.local
+        .get([
+          "netscapeFiles"
+        ])
+
+        .then(
+          async data => {
+
+            let files =
+              data.netscapeFiles;
+
+
+            /*
+             * Generate a fresh snapshot if
+             * no local Netscape snapshot exists.
+             */
+
+            if (!files) {
+
+              const snapshot =
+                await saveCookieSnapshot();
+
+
+              files =
+                snapshot.netscapeFiles;
+            }
+
+
+            const content =
+              files?.[service];
+
+
+            if (!content) {
+
+              throw new Error(
+                `No cookie file exists for ${service}.`
+              );
+            }
+
+
+            /*
+             * The popup creates the Blob URL
+             * because URL.createObjectURL() is not
+             * available inside the MV3 service worker.
+             */
+
+            sendResponse({
+
+              success:
+                true,
+
+              service,
+
+              content,
+
+              filename:
+                `${service}.txt`
+
+            });
+
+          }
+        )
+
+        .catch(error => {
+
+          sendResponse({
+
+            success:
+              false,
+
+            error:
+              error.message
+
+          });
+
+        });
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       UNKNOWN MESSAGE
+       ===================================================== */
+
+    sendResponse({
+
+      success:
+        false,
+
+      error:
+        `Unknown message type: ${message.type}`
+
+    });
+
+
+    return true;
+  }
+);
+
+
+/* =========================================================
+   STARTUP
+   ========================================================= */
+
+chrome.runtime.onStartup.addListener(
+  async () => {
+
+    console.log(
+      "[Cookie Sync] Extension startup."
+    );
+
+
+    try {
+
+      await saveCookieSnapshot();
+
+      await configureAutomaticSyncAlarm();
+
+
+    } catch (error) {
+
+      console.error(
+        "[Cookie Sync] Startup initialization failed:",
+        error
+      );
+    }
+
+  }
+);
+
+
+/* =========================================================
+   INSTALL / UPDATE
+   ========================================================= */
+
 chrome.runtime.onInstalled.addListener(
   async details => {
 
@@ -490,16 +1839,29 @@ chrome.runtime.onInstalled.addListener(
       `[Cookie Sync] Extension ${details.reason}`
     );
 
+
     try {
+
       await saveCookieSnapshot();
+
+      await configureAutomaticSyncAlarm();
+
+
     } catch (error) {
+
       console.error(
-        "[Cookie Sync] Installation sync failed:",
+        "[Cookie Sync] Installation initialization failed:",
         error
       );
     }
+
   }
 );
+
+
+/* =========================================================
+   SERVICE WORKER LOADED
+   ========================================================= */
 
 console.log(
   "[Cookie Sync] Background service worker loaded."

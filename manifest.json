@@ -1,19 +1,24 @@
 {
   "manifest_version": 3,
   "name": "JoqniX Cookie Sync",
-  "version": "0.1.0",
-  "description": "Automatically sync selected browser cookies for JoqniX services.",
+  "version": "0.4.0",
+  "description": "Sync complete browser cookie jars for JoqniX services.",
   "permissions": [
     "cookies",
-    "storage"
+    "storage",
+    "downloads",
+    "alarms"
   ],
   "host_permissions": [
     "https://*.youtube.com/*",
     "https://youtube.com/*",
+    "https://*.google.com/*",
+    "https://google.com/*",
     "https://*.twitch.tv/*",
     "https://twitch.tv/*",
     "https://*.kick.com/*",
-    "https://kick.com/*"
+    "https://kick.com/*",
+    "https://api.joqnix.space/*"
   ],
   "background": {
     "service_worker": "background.js"

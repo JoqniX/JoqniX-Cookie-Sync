@@ -2,6 +2,7 @@
   box-sizing: border-box;
 }
 
+
 html,
 body {
   margin: 0;
@@ -21,34 +22,48 @@ body {
   color: #f5f3ff;
 }
 
+
 body {
   overflow: hidden;
 }
+
 
 .container {
   padding: 20px;
 }
 
-/* Header */
+
+/* =========================================================
+   HEADER
+   ========================================================= */
 
 .header {
   margin-bottom: 20px;
 }
 
+
 .header h1 {
   margin: 0;
+
   font-size: 19px;
   font-weight: 700;
+
   letter-spacing: -0.02em;
 }
 
+
 .header p {
   margin: 5px 0 0;
+
   color: #9b96aa;
+
   font-size: 12px;
 }
 
-/* Cards */
+
+/* =========================================================
+   CARDS
+   ========================================================= */
 
 .status-card,
 .services {
@@ -56,82 +71,133 @@ body {
   margin-bottom: 14px;
 
   background: #15121e;
+
   border: 1px solid #272230;
   border-radius: 12px;
 }
 
-/* Status */
+
+/* =========================================================
+   STATUS
+   ========================================================= */
 
 .status-row {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
 
   min-height: 28px;
 }
 
+
 .status-row + .status-row {
   margin-top: 7px;
 }
 
+
 .status-row span {
   color: #aaa4b8;
+
   font-size: 12px;
 }
+
 
 .status-row strong {
   font-size: 12px;
   font-weight: 600;
 }
 
-/* Services */
+
+/* =========================================================
+   SERVICES
+   ========================================================= */
 
 .services h2 {
   margin: 0 0 10px;
 
   font-size: 12px;
   font-weight: 600;
+
   color: #aaa4b8;
+
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
+
 .service {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
 
-  min-height: 32px;
+  min-height: 38px;
 }
+
 
 .service + .service {
   border-top: 1px solid #24202d;
 }
 
-.service > span:first-child {
+
+.service-info {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+}
+
+
+.service-name {
   font-size: 13px;
 }
 
-/* Service indicators */
+
+.service-actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+}
+
+
+.service-actions strong {
+  min-width: 25px;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  text-align: right;
+}
+
+
+/* =========================================================
+   SERVICE INDICATORS
+   ========================================================= */
 
 .indicator {
-  font-size: 11px;
+  font-size: 10px;
+
   color: #858092;
 }
+
 
 .indicator.connected {
   color: #7ee787;
 }
 
+
 .indicator.disconnected {
   color: #f08888;
 }
 
-/* Buttons */
 
-.actions {
-  margin-top: 4px;
-}
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 button {
   width: 100%;
@@ -153,20 +219,35 @@ button {
     opacity 0.15s ease;
 }
 
+
 button:hover {
   opacity: 0.9;
 }
 
+
 button:active {
   transform: scale(0.98);
 }
+
 
 button:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-/* Message */
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+
+.actions {
+  margin-top: 4px;
+}
+
+
+/* =========================================================
+   MESSAGE
+   ========================================================= */
 
 .message {
   min-height: 18px;
@@ -174,14 +255,562 @@ button:disabled {
   margin: 10px 2px 0;
 
   color: #9b96aa;
+
   font-size: 11px;
+
   text-align: center;
 }
+
 
 .message.success {
   color: #7ee787;
 }
 
+
 .message.error {
   color: #f08888;
+}
+
+
+/* =========================================================
+   CLOUDFLARE SYNC
+   ========================================================= */
+
+.cloud-section {
+  margin-top: 14px;
+  padding: 14px;
+
+  background: #15121e;
+
+  border: 1px solid #272230;
+  border-radius: 12px;
+}
+
+
+.section-header {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 10px;
+}
+
+
+.section-header h2 {
+  margin: 0;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+.cloud-status {
+  display: inline-block;
+
+  margin-top: 3px;
+
+  font-size: 10px;
+
+  color: #858092;
+}
+
+
+.cloud-status.connected {
+  color: #8fd694;
+}
+
+
+.cloud-status.disconnected {
+  color: #d98b8b;
+}
+
+
+.cloud-info {
+  margin-bottom: 10px;
+}
+
+
+.cloud-info .status-row {
+  min-height: 25px;
+}
+
+
+.cloud-info .status-row strong {
+  max-width: 190px;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+
+  font-size: 10px;
+}
+
+
+/* Worker health */
+
+.health-display.connected {
+  color: #7ee787;
+}
+
+
+.health-display.disconnected {
+  color: #f08888;
+}
+
+
+/* Cloud sync button */
+
+.cloud-sync-button {
+  width: 100%;
+  height: 36px;
+
+  margin-top: 2px;
+
+  background: #211d2b;
+  color: #ddd7ed;
+
+  border: 1px solid #342e40;
+  border-radius: 7px;
+
+  font-size: 11px;
+}
+
+
+.cloud-sync-button:hover {
+  background: #2b2637;
+}
+
+
+.cloud-sync-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+/* =========================================================
+   AUTOMATIC SYNC
+   ========================================================= */
+
+.setting-row {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 12px;
+  padding-top: 12px;
+
+  border-top: 1px solid #272230;
+}
+
+
+.setting-info {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 3px;
+
+  max-width: 265px;
+}
+
+
+.setting-info span {
+  font-size: 11px;
+}
+
+
+.setting-info small {
+  color: #777181;
+
+  font-size: 9px;
+
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   TOGGLE
+   ========================================================= */
+
+.toggle {
+  position: relative;
+
+  display: inline-block;
+
+  flex-shrink: 0;
+
+  width: 34px;
+  height: 19px;
+}
+
+
+.toggle input {
+  width: 0;
+  height: 0;
+
+  opacity: 0;
+}
+
+
+.toggle-slider {
+  position: absolute;
+
+  inset: 0;
+
+  background: #292431;
+
+  border: 1px solid #3a3345;
+  border-radius: 20px;
+
+  cursor: pointer;
+
+  transition:
+    0.15s ease;
+}
+
+
+.toggle-slider::before {
+  content: "";
+
+  position: absolute;
+
+  width: 13px;
+  height: 13px;
+
+  left: 2px;
+  top: 2px;
+
+  background: #8b8496;
+
+  border-radius: 50%;
+
+  transition:
+    0.15s ease;
+}
+
+
+.toggle input:checked +
+.toggle-slider::before {
+  transform:
+    translateX(15px);
+}
+
+
+.toggle input:checked +
+.toggle-slider {
+  background: #2f2940;
+}
+
+
+.toggle input:disabled +
+.toggle-slider {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+/* =========================================================
+   CLOUDFLARE CONFIG
+   ========================================================= */
+
+.cloud-config {
+  margin-top: 12px;
+
+  border-top: 1px solid #272230;
+
+  padding-top: 10px;
+}
+
+
+.cloud-config summary {
+  cursor: pointer;
+
+  color: #aaa4b8;
+
+  font-size: 10px;
+
+  user-select: none;
+}
+
+
+.config-fields {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 7px;
+
+  margin-top: 10px;
+}
+
+
+.config-fields label {
+  color: #858092;
+
+  font-size: 9px;
+}
+
+
+.config-fields input {
+  width: 100%;
+  height: 31px;
+
+  box-sizing: border-box;
+
+  padding:
+    0 9px;
+
+  background: #0b0910;
+  color: #c9c3d6;
+
+  border: 1px solid #292431;
+  border-radius: 6px;
+
+  outline: none;
+
+  font-family:
+    "Cascadia Code",
+    "Consolas",
+    monospace;
+
+  font-size: 9px;
+}
+
+
+.config-fields input:focus {
+  border-color: #453b55;
+}
+
+
+.token-status {
+  display: block;
+
+  margin-top: -2px;
+
+  font-size: 9px;
+
+  color: #858092;
+}
+
+
+.token-status.connected {
+  color: #7ee787;
+}
+
+
+.token-status.disconnected {
+  color: #f08888;
+}
+
+
+.save-config-button {
+  width: 100%;
+  height: 32px;
+
+  margin-top: 3px;
+
+  background: #211d2b;
+  color: #ddd7ed;
+
+  border: 1px solid #342e40;
+  border-radius: 6px;
+
+  font-size: 10px;
+}
+
+
+.save-config-button:hover {
+  background: #2b2637;
+}
+
+
+/* =========================================================
+   DOWNLOAD BUTTONS
+   ========================================================= */
+
+.download-button {
+  width: 27px;
+  height: 27px;
+
+  padding: 0;
+
+  background: #211d2b;
+  color: #aaa4b8;
+
+  border: 1px solid #342e40;
+  border-radius: 6px;
+
+  font-size: 13px;
+}
+
+
+.download-button:hover {
+  background: #2b2637;
+}
+
+
+/* =========================================================
+   VIEW BUTTONS
+   ========================================================= */
+
+.view-button {
+  width: auto;
+  height: 27px;
+
+  padding:
+    0 8px;
+
+  background: #211d2b;
+  color: #aaa4b8;
+
+  border: 1px solid #342e40;
+  border-radius: 6px;
+
+  font-size: 10px;
+}
+
+
+.view-button:hover {
+  background: #2b2637;
+}
+
+
+/* =========================================================
+   COOKIE VIEWER
+   ========================================================= */
+
+.cookie-viewer {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 10;
+
+  display: flex;
+
+  flex-direction: column;
+
+  padding: 14px;
+
+  background: #0d0b14;
+}
+
+
+.cookie-viewer.hidden {
+  display: none;
+}
+
+
+.viewer-header {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 9px;
+}
+
+
+.viewer-header h2 {
+  margin: 0;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+#viewer-count {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #858092;
+
+  font-size: 9px;
+}
+
+
+.close-button {
+  width: 28px;
+  height: 28px;
+
+  padding: 0;
+
+  background: #211d2b;
+  color: #aaa4b8;
+
+  border: 1px solid #342e40;
+  border-radius: 6px;
+
+  font-size: 17px;
+  line-height: 1;
+}
+
+
+.close-button:hover {
+  background: #2b2637;
+}
+
+
+#cookie-output {
+  flex: 1;
+
+  width: 100%;
+  min-height: 250px;
+
+  resize: none;
+
+  padding: 9px;
+
+  background: #0b0910;
+  color: #c9c3d6;
+
+  border: 1px solid #292431;
+  border-radius: 7px;
+
+  outline: none;
+
+  font-family:
+    "Cascadia Code",
+    "Consolas",
+    monospace;
+
+  font-size: 8px;
+
+  line-height: 1.5;
+}
+
+
+.viewer-actions {
+  display: flex;
+
+  gap: 7px;
+
+  margin-top: 9px;
+}
+
+
+.viewer-actions .copy-button {
+  flex: 1;
+
+  margin-top: 0;
+
+  height: 34px;
+
+  background: #ffffff;
+  color: #0d0b14;
+
+  font-size: 10px;
+}
+
+
+.copy-button.secondary {
+  background: #211d2b;
+  color: #ddd7ed;
+
+  border: 1px solid #342e40;
 }

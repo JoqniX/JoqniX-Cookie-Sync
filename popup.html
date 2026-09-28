@@ -1,69 +1,544 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
   <title>JoqniX Cookie Sync</title>
 
-  <link rel="stylesheet" href="popup.css">
+  <link
+    rel="stylesheet"
+    href="popup.css"
+  >
 </head>
 
 <body>
+
   <main class="container">
 
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
+
     <header class="header">
+
       <h1>JoqniX Cookie Sync</h1>
-      <p>Browser session synchronization</p>
+
+      <p>
+        Browser session synchronization
+      </p>
+
     </header>
 
+
+    <!-- =====================================================
+         OVERALL STATUS
+         ===================================================== -->
+
     <section class="status-card">
-      <div class="status-row">
-        <span>Status</span>
-        <strong id="status">Checking...</strong>
-      </div>
 
       <div class="status-row">
-        <span>Cookies detected</span>
-        <strong id="cookie-count">0</strong>
+        <span>Status</span>
+
+        <strong id="status">
+          Checking...
+        </strong>
       </div>
+
+
+      <div class="status-row">
+        <span>Total cookies</span>
+
+        <strong id="cookie-count">
+          0
+        </strong>
+      </div>
+
 
       <div class="status-row">
         <span>Last local sync</span>
-        <strong id="last-sync">Never</strong>
+
+        <strong id="last-sync">
+          Never
+        </strong>
       </div>
+
+
+      <div class="status-row">
+        <span>Last cloud sync</span>
+
+        <strong id="last-cloud-sync">
+          Never
+        </strong>
+      </div>
+
     </section>
+
+
+    <!-- =====================================================
+         SERVICES
+         ===================================================== -->
 
     <section class="services">
+
       <h2>Services</h2>
 
-      <div class="service">
-        <span>YouTube</span>
-        <span id="youtube-status" class="indicator">Checking</span>
-      </div>
+
+      <!-- YouTube -->
 
       <div class="service">
-        <span>Twitch</span>
-        <span id="twitch-status" class="indicator">Checking</span>
+
+        <div class="service-info">
+
+          <span class="service-name">
+            YouTube
+          </span>
+
+          <span
+            id="youtube-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="youtube-count">
+            0
+          </strong>
+
+          <button
+            class="view-button"
+            data-service="youtube.com"
+          >
+            View
+          </button>
+
+          <button
+            class="download-button"
+            data-service="youtube.com"
+            title="Download Netscape file"
+          >
+            ↓
+          </button>
+
+        </div>
+
       </div>
 
+
+      <!-- Google -->
+
       <div class="service">
-        <span>Kick</span>
-        <span id="kick-status" class="indicator">Checking</span>
+
+        <div class="service-info">
+
+          <span class="service-name">
+            Google
+          </span>
+
+          <span
+            id="google-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="google-count">
+            0
+          </strong>
+
+          <button
+            class="view-button"
+            data-service="google.com"
+          >
+            View
+          </button>
+
+          <button
+            class="download-button"
+            data-service="google.com"
+            title="Download Netscape file"
+          >
+            ↓
+          </button>
+
+        </div>
+
       </div>
+
+
+      <!-- Twitch -->
+
+      <div class="service">
+
+        <div class="service-info">
+
+          <span class="service-name">
+            Twitch
+          </span>
+
+          <span
+            id="twitch-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="twitch-count">
+            0
+          </strong>
+
+          <button
+            class="view-button"
+            data-service="twitch.tv"
+          >
+            View
+          </button>
+
+          <button
+            class="download-button"
+            data-service="twitch.tv"
+            title="Download Netscape file"
+          >
+            ↓
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- Kick -->
+
+      <div class="service">
+
+        <div class="service-info">
+
+          <span class="service-name">
+            Kick
+          </span>
+
+          <span
+            id="kick-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="kick-count">
+            0
+          </strong>
+
+          <button
+            class="view-button"
+            data-service="kick.com"
+          >
+            View
+          </button>
+
+          <button
+            class="download-button"
+            data-service="kick.com"
+            title="Download Netscape file"
+          >
+            ↓
+          </button>
+
+        </div>
+
+      </div>
+
     </section>
+
+
+    <!-- =====================================================
+         LOCAL ACTIONS
+         ===================================================== -->
 
     <section class="actions">
+
       <button id="sync-button">
-        Sync Locally
+        Refresh Cookie Snapshot
       </button>
+
     </section>
 
-    <p id="message" class="message"></p>
+
+    <!-- =====================================================
+         CLOUDFLARE SYNC
+         ===================================================== -->
+
+    <section class="cloud-section">
+
+      <div class="section-header">
+
+        <div>
+
+          <h2>
+            Cloudflare Sync
+          </h2>
+
+          <span
+            id="cloud-status"
+            class="cloud-status"
+          >
+            Checking
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <div class="cloud-info">
+
+        <div class="status-row">
+
+          <span>
+            Worker
+          </span>
+
+          <strong id="worker-display">
+            Not configured
+          </strong>
+
+        </div>
+
+
+        <div class="status-row">
+
+          <span>
+            Connection
+          </span>
+
+          <strong
+            id="health-display"
+            class="health-display"
+          >
+            Checking
+          </strong>
+
+        </div>
+
+
+        <div class="status-row">
+
+          <span>
+            Last cloud sync
+          </span>
+
+          <strong id="cloud-sync-display">
+            Never
+          </strong>
+
+        </div>
+
+      </div>
+
+
+      <button
+        id="cloud-sync-button"
+        class="cloud-sync-button"
+      >
+        Sync to Cloudflare
+      </button>
+
+
+      <div class="setting-row">
+
+        <div class="setting-info">
+
+          <span>
+            Automatic sync
+          </span>
+
+          <small>
+            Upload after cookie changes, with a 30 minute backup
+          </small>
+
+        </div>
+
+
+        <label class="toggle">
+
+          <input
+            type="checkbox"
+            id="automatic-sync"
+          >
+
+          <span class="toggle-slider"></span>
+
+        </label>
+
+      </div>
+
+
+      <details class="cloud-config">
+
+        <summary>
+          Cloudflare Configuration
+        </summary>
+
+
+        <div class="config-fields">
+
+          <label
+            for="worker-url"
+          >
+            Worker URL
+          </label>
+
+
+          <input
+            id="worker-url"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="https://api.joqnix.space/cookies"
+          >
+
+
+          <label
+            for="worker-token"
+          >
+            Sync Token
+          </label>
+
+
+          <input
+            id="worker-token"
+            type="password"
+            spellcheck="false"
+            autocomplete="new-password"
+            placeholder="Enter a new token to replace the saved token"
+          >
+
+
+          <span
+            id="token-status"
+            class="token-status"
+          >
+            Checking...
+          </span>
+
+
+          <button
+            id="save-config-button"
+            class="save-config-button"
+          >
+            Save Configuration
+          </button>
+
+        </div>
+
+      </details>
+
+    </section>
+
+
+    <!-- =====================================================
+         COOKIE VIEWER
+         ===================================================== -->
+
+    <section
+      id="cookie-viewer"
+      class="cookie-viewer hidden"
+    >
+
+      <div class="viewer-header">
+
+        <div>
+
+          <h2 id="viewer-title">
+            Cookie File
+          </h2>
+
+          <span id="viewer-count">
+            0 cookies
+          </span>
+
+        </div>
+
+
+        <button
+          id="close-viewer"
+          class="close-button"
+          title="Close"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <textarea
+        id="cookie-output"
+        readonly
+        spellcheck="false"
+      ></textarea>
+
+
+      <div class="viewer-actions">
+
+        <button
+          id="copy-button"
+          class="copy-button"
+        >
+          Copy Netscape File
+        </button>
+
+
+        <button
+          id="viewer-download-button"
+          class="copy-button secondary"
+        >
+          Download File
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         MESSAGE
+         ===================================================== -->
+
+    <p
+      id="message"
+      class="message"
+    ></p>
+
 
   </main>
 
-  <script src="popup.js"></script>
-</body>
-</html>
 
+  <script src="popup.js"></script>
+
+</body>
+
+</html>
