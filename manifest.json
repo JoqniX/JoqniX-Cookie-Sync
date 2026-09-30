@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JoqniX Cookie Sync",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Sync complete browser cookie jars for JoqniX services.",
   "permissions": [
     "cookies",
@@ -12,12 +12,22 @@
   "host_permissions": [
     "https://*.youtube.com/*",
     "https://youtube.com/*",
+
     "https://*.google.com/*",
     "https://google.com/*",
+
     "https://*.twitch.tv/*",
     "https://twitch.tv/*",
+
     "https://*.kick.com/*",
     "https://kick.com/*",
+
+    "https://*.meldstudio.co/*",
+    "https://meldstudio.co/*",
+
+    "https://*.casterlabs.co/*",
+    "https://casterlabs.co/*",
+
     "https://api.joqnix.space/*"
   ],
   "background": {
