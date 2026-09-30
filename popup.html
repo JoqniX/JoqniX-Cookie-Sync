@@ -81,23 +81,132 @@
 
 
     <!-- =====================================================
+         SYNC PROFILE
+         ===================================================== -->
+
+    <section class="profile-section">
+
+      <div class="section-header">
+
+        <div>
+
+          <h2>
+            Sync Profile
+          </h2>
+
+          <small>
+            Choose where this cookie snapshot is stored
+          </small>
+
+        </div>
+
+      </div>
+
+
+      <div class="profile-fields">
+
+        <label
+          for="sync-profile"
+        >
+          Profile Name
+        </label>
+
+
+        <input
+          id="sync-profile"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="default"
+          maxlength="64"
+        >
+
+
+        <span
+          id="profile-display"
+          class="profile-display"
+        >
+          Profile: default
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <!-- =====================================================
          SERVICES
          ===================================================== -->
 
     <section class="services">
 
-      <h2>Services</h2>
+      <div class="section-header">
+
+        <div>
+
+          <h2>
+            Services
+          </h2>
+
+          <small
+            id="selected-count"
+          >
+            6 of 6 selected
+          </small>
+
+        </div>
 
 
-      <!-- YouTube -->
+        <div class="selection-actions">
 
-      <div class="service">
+          <button
+            id="select-all-button"
+            class="small-button"
+            type="button"
+          >
+            Select All
+          </button>
+
+
+          <button
+            id="clear-all-button"
+            class="small-button secondary"
+            type="button"
+          >
+            Clear All
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===================================================
+           YouTube
+           =================================================== -->
+
+      <div
+        class="service"
+        data-service="youtube.com"
+      >
 
         <div class="service-info">
 
-          <span class="service-name">
-            YouTube
-          </span>
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="youtube.com"
+              checked
+            >
+
+            <span class="service-name">
+              YouTube
+            </span>
+
+          </label>
+
 
           <span
             id="youtube-status"
@@ -115,17 +224,21 @@
             0
           </strong>
 
+
           <button
             class="view-button"
             data-service="youtube.com"
+            type="button"
           >
             View
           </button>
+
 
           <button
             class="download-button"
             data-service="youtube.com"
             title="Download Netscape file"
+            type="button"
           >
             ↓
           </button>
@@ -135,15 +248,32 @@
       </div>
 
 
-      <!-- Google -->
+      <!-- ===================================================
+           Google
+           =================================================== -->
 
-      <div class="service">
+      <div
+        class="service"
+        data-service="google.com"
+      >
 
         <div class="service-info">
 
-          <span class="service-name">
-            Google
-          </span>
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="google.com"
+              checked
+            >
+
+            <span class="service-name">
+              Google
+            </span>
+
+          </label>
+
 
           <span
             id="google-status"
@@ -161,17 +291,21 @@
             0
           </strong>
 
+
           <button
             class="view-button"
             data-service="google.com"
+            type="button"
           >
             View
           </button>
+
 
           <button
             class="download-button"
             data-service="google.com"
             title="Download Netscape file"
+            type="button"
           >
             ↓
           </button>
@@ -181,15 +315,32 @@
       </div>
 
 
-      <!-- Twitch -->
+      <!-- ===================================================
+           Twitch
+           =================================================== -->
 
-      <div class="service">
+      <div
+        class="service"
+        data-service="twitch.tv"
+      >
 
         <div class="service-info">
 
-          <span class="service-name">
-            Twitch
-          </span>
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="twitch.tv"
+              checked
+            >
+
+            <span class="service-name">
+              Twitch
+            </span>
+
+          </label>
+
 
           <span
             id="twitch-status"
@@ -207,17 +358,21 @@
             0
           </strong>
 
+
           <button
             class="view-button"
             data-service="twitch.tv"
+            type="button"
           >
             View
           </button>
+
 
           <button
             class="download-button"
             data-service="twitch.tv"
             title="Download Netscape file"
+            type="button"
           >
             ↓
           </button>
@@ -227,15 +382,32 @@
       </div>
 
 
-      <!-- Kick -->
+      <!-- ===================================================
+           Kick
+           =================================================== -->
 
-      <div class="service">
+      <div
+        class="service"
+        data-service="kick.com"
+      >
 
         <div class="service-info">
 
-          <span class="service-name">
-            Kick
-          </span>
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="kick.com"
+              checked
+            >
+
+            <span class="service-name">
+              Kick
+            </span>
+
+          </label>
+
 
           <span
             id="kick-status"
@@ -253,17 +425,155 @@
             0
           </strong>
 
+
           <button
             class="view-button"
             data-service="kick.com"
+            type="button"
           >
             View
           </button>
+
 
           <button
             class="download-button"
             data-service="kick.com"
             title="Download Netscape file"
+            type="button"
+          >
+            ↓
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===================================================
+           Meld Studio
+           =================================================== -->
+
+      <div
+        class="service"
+        data-service="meldstudio.co"
+      >
+
+        <div class="service-info">
+
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="meldstudio.co"
+              checked
+            >
+
+            <span class="service-name">
+              Meld Studio
+            </span>
+
+          </label>
+
+
+          <span
+            id="meldstudio-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="meldstudio-count">
+            0
+          </strong>
+
+
+          <button
+            class="view-button"
+            data-service="meldstudio.co"
+            type="button"
+          >
+            View
+          </button>
+
+
+          <button
+            class="download-button"
+            data-service="meldstudio.co"
+            title="Download Netscape file"
+            type="button"
+          >
+            ↓
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===================================================
+           Casterlabs
+           =================================================== -->
+
+      <div
+        class="service"
+        data-service="casterlabs.co"
+      >
+
+        <div class="service-info">
+
+          <label class="service-selector">
+
+            <input
+              type="checkbox"
+              class="service-checkbox"
+              data-service="casterlabs.co"
+              checked
+            >
+
+            <span class="service-name">
+              Casterlabs
+            </span>
+
+          </label>
+
+
+          <span
+            id="casterlabs-status"
+            class="indicator"
+          >
+            Checking
+          </span>
+
+        </div>
+
+
+        <div class="service-actions">
+
+          <strong id="casterlabs-count">
+            0
+          </strong>
+
+
+          <button
+            class="view-button"
+            data-service="casterlabs.co"
+            type="button"
+          >
+            View
+          </button>
+
+
+          <button
+            class="download-button"
+            data-service="casterlabs.co"
+            title="Download Netscape file"
+            type="button"
           >
             ↓
           </button>
@@ -281,7 +591,10 @@
 
     <section class="actions">
 
-      <button id="sync-button">
+      <button
+        id="sync-button"
+        type="button"
+      >
         Refresh Cookie Snapshot
       </button>
 
@@ -348,6 +661,32 @@
         <div class="status-row">
 
           <span>
+            Active profile
+          </span>
+
+          <strong id="cloud-profile-display">
+            default
+          </strong>
+
+        </div>
+
+
+        <div class="status-row">
+
+          <span>
+            Selected services
+          </span>
+
+          <strong id="cloud-selected-display">
+            6
+          </strong>
+
+        </div>
+
+
+        <div class="status-row">
+
+          <span>
             Last cloud sync
           </span>
 
@@ -360,13 +699,35 @@
       </div>
 
 
-      <button
-        id="cloud-sync-button"
-        class="cloud-sync-button"
-      >
-        Sync to Cloudflare
-      </button>
+      <!-- ===================================================
+           CLOUD SYNC ACTIONS
+           =================================================== -->
 
+      <div class="cloud-sync-actions">
+
+        <button
+          id="cloud-sync-button"
+          class="cloud-sync-button"
+          type="button"
+        >
+          Sync Selected
+        </button>
+
+
+        <button
+          id="cloud-sync-all-button"
+          class="cloud-sync-button secondary"
+          type="button"
+        >
+          Sync All
+        </button>
+
+      </div>
+
+
+      <!-- ===================================================
+           AUTOMATIC SYNC
+           =================================================== -->
 
       <div class="setting-row">
 
@@ -377,7 +738,7 @@
           </span>
 
           <small>
-            Upload after cookie changes, with a 30 minute backup
+            Upload selected services after cookie changes, with a 30 minute backup
           </small>
 
         </div>
@@ -396,6 +757,10 @@
 
       </div>
 
+
+      <!-- ===================================================
+           CLOUDFLARE CONFIGURATION
+           =================================================== -->
 
       <details class="cloud-config">
 
@@ -449,6 +814,7 @@
           <button
             id="save-config-button"
             class="save-config-button"
+            type="button"
           >
             Save Configuration
           </button>
@@ -488,6 +854,7 @@
           id="close-viewer"
           class="close-button"
           title="Close"
+          type="button"
         >
           ×
         </button>
@@ -507,6 +874,7 @@
         <button
           id="copy-button"
           class="copy-button"
+          type="button"
         >
           Copy Netscape File
         </button>
@@ -515,6 +883,7 @@
         <button
           id="viewer-download-button"
           class="copy-button secondary"
+          type="button"
         >
           Download File
         </button>
