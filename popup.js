@@ -1,29 +1,45 @@
 // JoqniX Cookie Sync
 // Popup Controller
-// Version: 0.4.0
+// Version: 0.5.0
+
+
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+
+const SUPPORTED_DOMAINS = [
+  "youtube.com",
+  "google.com",
+  "twitch.tv",
+  "kick.com",
+  "meldstudio.co",
+  "casterlabs.co"
+];
+
+const DEFAULT_PROFILE =
+  "default";
 
 
 /* =========================================================
    ELEMENTS
    ========================================================= */
 
+/* General status */
+
 const statusElement =
   document.getElementById(
     "status"
   );
-
 
 const cookieCountElement =
   document.getElementById(
     "cookie-count"
   );
 
-
 const lastSyncElement =
   document.getElementById(
     "last-sync"
   );
-
 
 const lastCloudSyncElement =
   document.getElementById(
@@ -31,7 +47,24 @@ const lastCloudSyncElement =
   );
 
 
-/* Services */
+/* =========================================================
+   PROFILE
+   ========================================================= */
+
+const syncProfileInput =
+  document.getElementById(
+    "sync-profile"
+  );
+
+const profileDisplay =
+  document.getElementById(
+    "profile-display"
+  );
+
+
+/* =========================================================
+   SERVICE ELEMENTS
+   ========================================================= */
 
 const serviceElements = {
 
@@ -92,66 +125,127 @@ const serviceElements = {
         "kick-count"
       )
 
+  },
+
+
+  "meldstudio.co": {
+
+    status:
+      document.getElementById(
+        "meldstudio-status"
+      ),
+
+    count:
+      document.getElementById(
+        "meldstudio-count"
+      )
+
+  },
+
+
+  "casterlabs.co": {
+
+    status:
+      document.getElementById(
+        "casterlabs-status"
+      ),
+
+    count:
+      document.getElementById(
+        "casterlabs-count"
+      )
+
   }
 
 };
 
 
-/* Cloudflare */
+/* Service selection */
+
+const serviceCheckboxes =
+  document.querySelectorAll(
+    ".service-checkbox"
+  );
+
+const selectedCountElement =
+  document.getElementById(
+    "selected-count"
+  );
+
+const selectAllButton =
+  document.getElementById(
+    "select-all-button"
+  );
+
+const clearAllButton =
+  document.getElementById(
+    "clear-all-button"
+  );
+
+
+/* =========================================================
+   CLOUDFLARE
+   ========================================================= */
 
 const cloudStatus =
   document.getElementById(
     "cloud-status"
   );
 
-
 const workerDisplay =
   document.getElementById(
     "worker-display"
   );
-
 
 const healthDisplay =
   document.getElementById(
     "health-display"
   );
 
-
 const cloudSyncDisplay =
   document.getElementById(
     "cloud-sync-display"
   );
 
+const cloudProfileDisplay =
+  document.getElementById(
+    "cloud-profile-display"
+  );
+
+const cloudSelectedDisplay =
+  document.getElementById(
+    "cloud-selected-display"
+  );
 
 const cloudSyncButton =
   document.getElementById(
     "cloud-sync-button"
   );
 
+const cloudSyncAllButton =
+  document.getElementById(
+    "cloud-sync-all-button"
+  );
 
 const automaticSync =
   document.getElementById(
     "automatic-sync"
   );
 
-
 const workerUrlInput =
   document.getElementById(
     "worker-url"
   );
-
 
 const workerTokenInput =
   document.getElementById(
     "worker-token"
   );
 
-
 const tokenStatus =
   document.getElementById(
     "token-status"
   );
-
 
 const saveConfigButton =
   document.getElementById(
@@ -159,13 +253,14 @@ const saveConfigButton =
   );
 
 
-/* General */
+/* =========================================================
+   GENERAL
+   ========================================================= */
 
 const syncButton =
   document.getElementById(
     "sync-button"
   );
-
 
 const messageElement =
   document.getElementById(
@@ -173,43 +268,39 @@ const messageElement =
   );
 
 
-/* Viewer */
+/* =========================================================
+   VIEWER
+   ========================================================= */
 
 const cookieViewer =
   document.getElementById(
     "cookie-viewer"
   );
 
-
 const viewerTitle =
   document.getElementById(
     "viewer-title"
   );
-
 
 const viewerCount =
   document.getElementById(
     "viewer-count"
   );
 
-
 const cookieOutput =
   document.getElementById(
     "cookie-output"
   );
-
 
 const closeViewerButton =
   document.getElementById(
     "close-viewer"
   );
 
-
 const copyButton =
   document.getElementById(
     "copy-button"
   );
-
 
 const viewerDownloadButton =
   document.getElementById(
@@ -225,12 +316,21 @@ let currentFiles = {};
 
 let currentService = null;
 
+let currentProfile =
+  DEFAULT_PROFILE;
+
+let currentSelectedDomains = [
+  ...SUPPORTED_DOMAINS
+];
+
 
 /* =========================================================
    MESSAGE HELPER
    ========================================================= */
 
-function sendMessage(message) {
+function sendMessage(
+  message
+) {
 
   return new Promise(
     (
@@ -278,7 +378,9 @@ function formatTimestamp(
   timestamp
 ) {
 
-  if (!timestamp) {
+  if (
+    !timestamp
+  ) {
     return "Never";
   }
 
@@ -289,9 +391,13 @@ function formatTimestamp(
 }
 
 
-function shortenUrl(url) {
+function shortenUrl(
+  url
+) {
 
-  if (!url) {
+  if (
+    !url
+  ) {
     return "Not configured";
   }
 
@@ -307,11 +413,48 @@ function shortenUrl(url) {
       parsed.pathname
     );
 
-
   } catch {
 
     return url;
+
   }
+}
+
+
+function normalizeProfile(
+  profile
+) {
+
+  if (
+    typeof profile !==
+    "string"
+  ) {
+    return DEFAULT_PROFILE;
+  }
+
+
+  const normalized =
+    profile
+      .trim()
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9_-]+/g,
+        "-"
+      )
+      .replace(
+        /^[-_]+|[-_]+$/g,
+        ""
+      )
+      .slice(
+        0,
+        64
+      );
+
+
+  return (
+    normalized ||
+    DEFAULT_PROFILE
+  );
 }
 
 
@@ -324,13 +467,22 @@ function updateIndicator(
   connected
 ) {
 
+  if (
+    !element
+  ) {
+    return;
+  }
+
+
   element.classList.remove(
     "connected",
     "disconnected"
   );
 
 
-  if (connected) {
+  if (
+    connected
+  ) {
 
     element.textContent =
       "Detected";
@@ -339,7 +491,6 @@ function updateIndicator(
     element.classList.add(
       "connected"
     );
-
 
   } else {
 
@@ -374,18 +525,565 @@ function updateServiceStatus(
   ) {
 
     const count =
-      cookieCounts[service] ||
-      0;
+      cookieCounts?.[
+        service
+      ] || 0;
 
 
-    elements.count.textContent =
-      count;
+    if (
+      elements.count
+    ) {
+
+      elements.count.textContent =
+        count;
+
+    }
 
 
-    updateIndicator(
-      elements.status,
-      count > 0
+    if (
+      elements.status
+    ) {
+
+      updateIndicator(
+        elements.status,
+        count > 0
+      );
+
+    }
+
+  }
+}
+
+
+/* =========================================================
+   SERVICE SELECTION
+   ========================================================= */
+
+function getSelectedDomainsFromUI() {
+
+  return [
+    ...serviceCheckboxes
+  ]
+    .filter(
+      checkbox =>
+        checkbox.checked
+    )
+    .map(
+      checkbox =>
+        checkbox.dataset.service
+    )
+    .filter(
+      service =>
+        SUPPORTED_DOMAINS.includes(
+          service
+        )
     );
+}
+
+
+function updateSelectedCount() {
+
+  const selected =
+    getSelectedDomainsFromUI();
+
+  const count =
+    selected.length;
+
+
+  currentSelectedDomains =
+    selected;
+
+
+  if (
+    selectedCountElement
+  ) {
+
+    selectedCountElement.textContent =
+      `${count} of ${SUPPORTED_DOMAINS.length} selected`;
+
+  }
+
+
+  if (
+    cloudSelectedDisplay
+  ) {
+
+    cloudSelectedDisplay.textContent =
+      String(count);
+
+  }
+
+
+  if (
+    cloudSyncButton
+  ) {
+
+    cloudSyncButton.disabled =
+      count === 0;
+
+  }
+
+
+  updateSelectionButtonStates();
+}
+
+
+function updateSelectionButtonStates() {
+
+  const selectedCount =
+    getSelectedDomainsFromUI().length;
+
+
+  if (
+    selectAllButton
+  ) {
+
+    selectAllButton.disabled =
+      selectedCount ===
+      SUPPORTED_DOMAINS.length;
+
+  }
+
+
+  if (
+    clearAllButton
+  ) {
+
+    clearAllButton.disabled =
+      selectedCount === 0;
+
+  }
+}
+
+
+function applySelectedDomains(
+  selectedDomains
+) {
+
+  const selectedSet =
+    new Set(
+      selectedDomains
+    );
+
+
+  serviceCheckboxes.forEach(
+    checkbox => {
+
+      checkbox.checked =
+        selectedSet.has(
+          checkbox.dataset.service
+        );
+
+    }
+  );
+
+
+  currentSelectedDomains =
+    [
+      ...selectedDomains
+    ];
+
+
+  updateSelectedCount();
+}
+
+
+async function saveSelectedDomains(
+  selectedDomains
+) {
+
+  const response =
+    await sendMessage({
+
+      type:
+        "SET_SELECTED_DOMAINS",
+
+      selectedDomains
+
+    });
+
+
+  if (
+    !response?.success
+  ) {
+
+    throw new Error(
+      response?.error ||
+      "Failed to save selected services."
+    );
+
+  }
+
+
+  applySelectedDomains(
+    response.selectedDomains ||
+    []
+  );
+
+
+  return response.selectedDomains ||
+    [];
+}
+
+
+async function selectAllServices() {
+
+  try {
+
+    clearMessage();
+
+
+    selectAllButton.disabled =
+      true;
+
+
+    const response =
+      await sendMessage({
+
+        type:
+          "SELECT_ALL_DOMAINS"
+
+      });
+
+
+    if (
+      !response?.success
+    ) {
+
+      throw new Error(
+        response?.error ||
+        "Failed to select all services."
+      );
+
+    }
+
+
+    applySelectedDomains(
+      response.selectedDomains ||
+      SUPPORTED_DOMAINS
+    );
+
+
+    showMessage(
+      "All cookie services selected.",
+      "success"
+    );
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] Select all failed:",
+      error
+    );
+
+
+    showMessage(
+      error.message,
+      "error"
+    );
+
+  } finally {
+
+    updateSelectionButtonStates();
+
+  }
+}
+
+
+async function clearAllServices() {
+
+  try {
+
+    clearMessage();
+
+
+    clearAllButton.disabled =
+      true;
+
+
+    const response =
+      await sendMessage({
+
+        type:
+          "CLEAR_SELECTED_DOMAINS"
+
+      });
+
+
+    if (
+      !response?.success
+    ) {
+
+      throw new Error(
+        response?.error ||
+        "Failed to clear service selection."
+      );
+
+    }
+
+
+    applySelectedDomains(
+      []
+    );
+
+
+    showMessage(
+      "All cookie services deselected.",
+      "success"
+    );
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] Clear all failed:",
+      error
+    );
+
+
+    showMessage(
+      error.message,
+      "error"
+    );
+
+  } finally {
+
+    updateSelectionButtonStates();
+
+  }
+}
+
+
+async function handleServiceSelectionChange(
+  checkbox
+) {
+
+  const previousSelection =
+    [
+      ...currentSelectedDomains
+    ];
+
+
+  const selectedDomains =
+    getSelectedDomainsFromUI();
+
+
+  try {
+
+    clearMessage();
+
+
+    /*
+     * An empty selection is allowed in the UI.
+     * It simply means Sync Selected is disabled.
+     *
+     * Use CLEAR_SELECTED_DOMAINS because
+     * SET_SELECTED_DOMAINS intentionally
+     * rejects an empty list.
+     */
+
+    let response;
+
+
+    if (
+      selectedDomains.length ===
+      0
+    ) {
+
+      response =
+        await sendMessage({
+
+          type:
+            "CLEAR_SELECTED_DOMAINS"
+
+        });
+
+    } else {
+
+      response =
+        await sendMessage({
+
+          type:
+            "SET_SELECTED_DOMAINS",
+
+          selectedDomains
+
+        });
+
+    }
+
+
+    if (
+      !response?.success
+    ) {
+
+      throw new Error(
+        response?.error ||
+        "Failed to update selected services."
+      );
+
+    }
+
+
+    applySelectedDomains(
+      response.selectedDomains ||
+      selectedDomains
+    );
+
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] Service selection update failed:",
+      error
+    );
+
+
+    /*
+     * Restore previous selection.
+     */
+
+    applySelectedDomains(
+      previousSelection
+    );
+
+
+    showMessage(
+      error.message,
+      "error"
+    );
+
+  }
+}
+
+
+/* =========================================================
+   PROFILE UI
+   ========================================================= */
+
+function updateProfileUI(
+  profile
+) {
+
+  const normalized =
+    normalizeProfile(
+      profile
+    );
+
+
+  currentProfile =
+    normalized;
+
+
+  if (
+    syncProfileInput
+  ) {
+
+    syncProfileInput.value =
+      normalized;
+
+  }
+
+
+  if (
+    profileDisplay
+  ) {
+
+    profileDisplay.textContent =
+      `Profile: ${normalized}`;
+
+  }
+
+
+  if (
+    cloudProfileDisplay
+  ) {
+
+    cloudProfileDisplay.textContent =
+      normalized;
+
+  }
+}
+
+
+async function saveProfile(
+  showSuccess = false
+) {
+
+  const profile =
+    normalizeProfile(
+      syncProfileInput?.value ||
+      DEFAULT_PROFILE
+    );
+
+
+  try {
+
+    const response =
+      await sendMessage({
+
+        type:
+          "SET_SYNC_PROFILE",
+
+        profile
+
+      });
+
+
+    if (
+      !response?.success
+    ) {
+
+      throw new Error(
+        response?.error ||
+        "Failed to save sync profile."
+      );
+
+    }
+
+
+    updateProfileUI(
+      response.syncProfile ||
+      profile
+    );
+
+
+    if (
+      showSuccess
+    ) {
+
+      showMessage(
+        `Sync profile set to "${currentProfile}".`,
+        "success"
+      );
+
+    }
+
+
+    return currentProfile;
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] Failed to save profile:",
+      error
+    );
+
+
+    showMessage(
+      error.message,
+      "error"
+    );
+
+
+    return null;
 
   }
 }
@@ -405,17 +1103,22 @@ async function loadStatus() {
 
     const response =
       await sendMessage({
+
         type:
           "GET_STATUS"
+
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Failed to retrieve status."
       );
+
     }
 
 
@@ -454,11 +1157,59 @@ async function loadStatus() {
       );
 
 
+    updateProfileUI(
+      response.syncProfile ||
+      DEFAULT_PROFILE
+    );
+
+
+    applySelectedDomains(
+      Array.isArray(
+        response.selectedDomains
+      )
+        ? response.selectedDomains
+        : SUPPORTED_DOMAINS
+    );
+
+
+    if (
+      response.lastCloudSyncProfile
+    ) {
+
+      cloudProfileDisplay.textContent =
+        response.lastCloudSyncProfile;
+
+    }
+
+
+    if (
+      Array.isArray(
+        response.lastCloudSyncSelectedDomains
+      )
+    ) {
+
+      /*
+       * Don't overwrite the current
+       * selection here.
+       *
+       * This only informs the status display.
+       */
+
+      cloudSelectedDisplay.textContent =
+        String(
+          response.lastCloudSyncSelectedDomains.length
+        );
+
+    }
+
+
     statusElement.textContent =
       "Ready";
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Failed to load status:",
@@ -474,6 +1225,7 @@ async function loadStatus() {
       error.message,
       "error"
     );
+
   }
 }
 
@@ -499,17 +1251,22 @@ async function syncLocally() {
 
     const response =
       await sendMessage({
+
         type:
           "SYNC_LOCAL"
+
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Local sync failed."
       );
+
     }
 
 
@@ -539,7 +1296,9 @@ async function syncLocally() {
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Local sync failed:",
@@ -561,6 +1320,7 @@ async function syncLocally() {
 
     syncButton.textContent =
       "Refresh Cookie Snapshot";
+
   }
 }
 
@@ -573,17 +1333,22 @@ async function loadNetscapeFiles() {
 
   const response =
     await sendMessage({
+
       type:
         "GET_NETSCAPE"
+
     });
 
 
-  if (!response?.success) {
+  if (
+    !response?.success
+  ) {
 
     throw new Error(
       response?.error ||
       "Failed to retrieve Netscape files."
     );
+
   }
 
 
@@ -615,6 +1380,7 @@ async function openCookieViewer(
     ) {
 
       await loadNetscapeFiles();
+
     }
 
 
@@ -622,11 +1388,14 @@ async function openCookieViewer(
       currentFiles[service];
 
 
-    if (!content) {
+    if (
+      !content
+    ) {
 
       throw new Error(
         `No cookie file available for ${service}.`
       );
+
     }
 
 
@@ -661,7 +1430,9 @@ async function openCookieViewer(
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Failed to open cookie viewer:",
@@ -673,6 +1444,7 @@ async function openCookieViewer(
       error.message,
       "error"
     );
+
   }
 }
 
@@ -693,7 +1465,13 @@ function getDisplayName(
       "Twitch",
 
     "kick.com":
-      "Kick"
+      "Kick",
+
+    "meldstudio.co":
+      "Meld Studio",
+
+    "casterlabs.co":
+      "Casterlabs"
 
   };
 
@@ -729,11 +1507,14 @@ async function copyCookieFile() {
 
   try {
 
-    if (!cookieOutput.value) {
+    if (
+      !cookieOutput.value
+    ) {
 
       throw new Error(
         "There is no cookie file to copy."
       );
+
     }
 
 
@@ -763,7 +1544,9 @@ async function copyCookieFile() {
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Copy failed:",
@@ -775,6 +1558,7 @@ async function copyCookieFile() {
       "Failed to copy cookie file.",
       "error"
     );
+
   }
 }
 
@@ -789,11 +1573,14 @@ async function downloadCookieFile(
 
   try {
 
-    if (!service) {
+    if (
+      !service
+    ) {
 
       throw new Error(
         "No cookie service selected."
       );
+
     }
 
 
@@ -808,19 +1595,22 @@ async function downloadCookieFile(
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Failed to retrieve cookie file."
       );
+
     }
 
 
     /*
      * The popup runs in a normal extension
-     * document, so createObjectURL() is
-     * available here.
+     * document, so createObjectURL()
+     * is available here.
      */
 
     const blob =
@@ -885,7 +1675,9 @@ async function downloadCookieFile(
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Download failed:",
@@ -897,6 +1689,7 @@ async function downloadCookieFile(
       error.message,
       "error"
     );
+
   }
 }
 
@@ -911,17 +1704,22 @@ async function loadCloudConfig() {
 
     const response =
       await sendMessage({
+
         type:
           "GET_CONFIG"
+
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Failed to load Cloudflare configuration."
       );
+
     }
 
 
@@ -934,6 +1732,21 @@ async function loadCloudConfig() {
       Boolean(
         response.syncAutomatically
       );
+
+
+    updateProfileUI(
+      response.syncProfile ||
+      DEFAULT_PROFILE
+    );
+
+
+    applySelectedDomains(
+      Array.isArray(
+        response.selectedDomains
+      )
+        ? response.selectedDomains
+        : SUPPORTED_DOMAINS
+    );
 
 
     updateTokenStatus(
@@ -960,10 +1773,13 @@ async function loadCloudConfig() {
         "Not configured",
         false
       );
+
     }
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Failed to load cloud config:",
@@ -986,6 +1802,7 @@ async function loadCloudConfig() {
       "Not configured",
       false
     );
+
   }
 }
 
@@ -1042,6 +1859,7 @@ function updateCloudStatus(
             workerUrl
           )
         : "Not configured";
+
   }
 }
 
@@ -1056,7 +1874,9 @@ function updateTokenStatus(
   );
 
 
-  if (hasToken) {
+  if (
+    hasToken
+  ) {
 
     tokenStatus.textContent =
       "Saved token is configured";
@@ -1076,6 +1896,7 @@ function updateTokenStatus(
     tokenStatus.classList.add(
       "disconnected"
     );
+
   }
 }
 
@@ -1121,17 +1942,22 @@ async function checkCloudflareHealth(
 
     const response =
       await sendMessage({
+
         type:
           "CHECK_CLOUDFLARE_HEALTH"
+
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Cloudflare health check failed."
       );
+
     }
 
 
@@ -1159,10 +1985,27 @@ async function checkCloudflareHealth(
     );
 
 
+    /*
+     * If the Worker reports a profile,
+     * show it as informational state.
+     */
+
+    if (
+      result?.lastProfile
+    ) {
+
+      cloudProfileDisplay.textContent =
+        result.lastProfile;
+
+    }
+
+
     return result;
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Cloudflare health check failed:",
@@ -1178,12 +2021,15 @@ async function checkCloudflareHealth(
     );
 
 
-    if (showErrors) {
+    if (
+      showErrors
+    ) {
 
       showMessage(
         error.message,
         "error"
       );
+
     }
 
 
@@ -1260,11 +2106,24 @@ async function saveCloudConfig() {
       workerTokenInput.value.trim();
 
 
-    if (!workerUrl) {
+    const syncProfile =
+      normalizeProfile(
+        syncProfileInput.value
+      );
+
+
+    const selectedDomains =
+      getSelectedDomainsFromUI();
+
+
+    if (
+      !workerUrl
+    ) {
 
       throw new Error(
         "Worker URL is required."
       );
+
     }
 
 
@@ -1288,17 +2147,24 @@ async function saveCloudConfig() {
           : {}),
 
         syncAutomatically:
-          automaticSync.checked
+          automaticSync.checked,
+
+        syncProfile,
+
+        selectedDomains
 
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Failed to save configuration."
       );
+
     }
 
 
@@ -1308,12 +2174,24 @@ async function saveCloudConfig() {
 
     updateCloudStatus(
       response.hasToken,
-      workerUrl
+      response.workerUrl
     );
 
 
     updateTokenStatus(
       response.hasToken
+    );
+
+
+    updateProfileUI(
+      response.syncProfile ||
+      syncProfile
+    );
+
+
+    applySelectedDomains(
+      response.selectedDomains ||
+      selectedDomains
     );
 
 
@@ -1328,7 +2206,9 @@ async function saveCloudConfig() {
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Failed to save config:",
@@ -1350,6 +2230,7 @@ async function saveCloudConfig() {
 
     saveConfigButton.textContent =
       "Save Configuration";
+
   }
 }
 
@@ -1358,7 +2239,25 @@ async function saveCloudConfig() {
    CLOUD SYNC
    ========================================================= */
 
-async function syncToCloudflare() {
+async function syncSelectedToCloudflare() {
+
+  const selectedDomains =
+    getSelectedDomainsFromUI();
+
+
+  if (
+    selectedDomains.length ===
+    0
+  ) {
+
+    showMessage(
+      "Select at least one cookie service before syncing.",
+      "error"
+    );
+
+    return;
+  }
+
 
   try {
 
@@ -1373,19 +2272,55 @@ async function syncToCloudflare() {
     clearMessage();
 
 
+    /*
+     * Make sure the profile shown in the UI
+     * is the profile actually stored in the
+     * background worker before uploading.
+     */
+
+    const profile =
+      await saveProfile();
+
+
+    if (
+      !profile
+    ) {
+
+      throw new Error(
+        "Unable to save the sync profile."
+      );
+
+    }
+
+
+    /*
+     * Make sure the latest selection is
+     * stored before the cloud upload.
+     */
+
+    await saveSelectedDomains(
+      selectedDomains
+    );
+
+
     const response =
       await sendMessage({
+
         type:
-          "SYNC_CLOUD"
+          "SYNC_SELECTED"
+
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Cloudflare sync failed."
       );
+
     }
 
 
@@ -1398,6 +2333,18 @@ async function syncToCloudflare() {
     cloudSyncDisplay.textContent =
       formatTimestamp(
         response.timestamp
+      );
+
+
+    cloudProfileDisplay.textContent =
+      response.profile ||
+      profile;
+
+
+    cloudSelectedDisplay.textContent =
+      String(
+        response.selectedDomains?.length ||
+        selectedDomains.length
       );
 
 
@@ -1422,15 +2369,17 @@ async function syncToCloudflare() {
 
 
     showMessage(
-      `Cloudflare sync completed: ${response.count} cookies`,
+      `Cloudflare sync completed: ${response.count} cookies across ${response.selectedDomains?.length || selectedDomains.length} services`,
       "success"
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
-      "[Cookie Sync] Cloudflare sync failed:",
+      "[Cookie Sync] Cloudflare selected sync failed:",
       error
     );
 
@@ -1452,11 +2401,165 @@ async function syncToCloudflare() {
   } finally {
 
     cloudSyncButton.disabled =
-      false;
+      getSelectedDomainsFromUI()
+        .length === 0;
 
 
     cloudSyncButton.textContent =
-      "Sync to Cloudflare";
+      "Sync Selected";
+
+  }
+}
+
+
+async function syncAllToCloudflare() {
+
+  try {
+
+    cloudSyncAllButton.disabled =
+      true;
+
+
+    cloudSyncButton.disabled =
+      true;
+
+
+    cloudSyncAllButton.textContent =
+      "Syncing...";
+
+
+    clearMessage();
+
+
+    /*
+     * Sync All still uses the currently
+     * selected profile.
+     */
+
+    const profile =
+      await saveProfile();
+
+
+    if (
+      !profile
+    ) {
+
+      throw new Error(
+        "Unable to save the sync profile."
+      );
+
+    }
+
+
+    const response =
+      await sendMessage({
+
+        type:
+          "SYNC_ALL"
+
+      });
+
+
+    if (
+      !response?.success
+    ) {
+
+      throw new Error(
+        response?.error ||
+        "Cloudflare sync failed."
+      );
+
+    }
+
+
+    lastCloudSyncElement.textContent =
+      formatTimestamp(
+        response.timestamp
+      );
+
+
+    cloudSyncDisplay.textContent =
+      formatTimestamp(
+        response.timestamp
+      );
+
+
+    cloudProfileDisplay.textContent =
+      response.profile ||
+      profile;
+
+
+    cloudSelectedDisplay.textContent =
+      String(
+        response.selectedDomains?.length ||
+        SUPPORTED_DOMAINS.length
+      );
+
+
+    updateHealthStatus(
+      "Connected",
+      true
+    );
+
+
+    cloudStatus.textContent =
+      "Connected";
+
+
+    cloudStatus.classList.remove(
+      "disconnected"
+    );
+
+
+    cloudStatus.classList.add(
+      "connected"
+    );
+
+
+    showMessage(
+      `Cloudflare sync completed: ${response.count} cookies across ${response.selectedDomains?.length || SUPPORTED_DOMAINS.length} services`,
+      "success"
+    );
+
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] Cloudflare full sync failed:",
+      error
+    );
+
+
+    updateHealthStatus(
+      getHealthErrorLabel(
+        error.message
+      ),
+      false
+    );
+
+
+    showMessage(
+      error.message,
+      "error"
+    );
+
+
+  } finally {
+
+    cloudSyncAllButton.disabled =
+      false;
+
+
+    cloudSyncButton.disabled =
+      getSelectedDomainsFromUI()
+        .length === 0;
+
+
+    cloudSyncAllButton.textContent =
+      "Sync All";
+
   }
 }
 
@@ -1488,12 +2591,15 @@ async function updateAutomaticSync() {
       });
 
 
-    if (!response?.success) {
+    if (
+      !response?.success
+    ) {
 
       throw new Error(
         response?.error ||
         "Failed to update automatic sync."
       );
+
     }
 
 
@@ -1505,7 +2611,9 @@ async function updateAutomaticSync() {
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       "[Cookie Sync] Automatic sync update failed:",
@@ -1514,8 +2622,7 @@ async function updateAutomaticSync() {
 
 
     /*
-     * Restore the previous state from
-     * the background service worker.
+     * Restore the previous state.
      */
 
     automaticSync.checked =
@@ -1532,6 +2639,7 @@ async function updateAutomaticSync() {
 
     automaticSync.disabled =
       false;
+
   }
 }
 
@@ -1570,7 +2678,9 @@ function clearMessage() {
    ========================================================= */
 
 
-/* View buttons */
+/* ---------------------------------------------------------
+   View buttons
+   --------------------------------------------------------- */
 
 document
   .querySelectorAll(
@@ -1594,7 +2704,9 @@ document
   );
 
 
-/* Download buttons */
+/* ---------------------------------------------------------
+   Download buttons
+   --------------------------------------------------------- */
 
 document
   .querySelectorAll(
@@ -1618,7 +2730,98 @@ document
   );
 
 
-/* Local refresh */
+/* ---------------------------------------------------------
+   Service checkboxes
+   --------------------------------------------------------- */
+
+serviceCheckboxes.forEach(
+  checkbox => {
+
+    checkbox.addEventListener(
+      "change",
+      () => {
+
+        handleServiceSelectionChange(
+          checkbox
+        );
+
+      }
+    );
+
+  }
+);
+
+
+/* ---------------------------------------------------------
+   Select all
+   --------------------------------------------------------- */
+
+selectAllButton.addEventListener(
+  "click",
+  selectAllServices
+);
+
+
+/* ---------------------------------------------------------
+   Clear all
+   --------------------------------------------------------- */
+
+clearAllButton.addEventListener(
+  "click",
+  clearAllServices
+);
+
+
+/* ---------------------------------------------------------
+   Profile
+   --------------------------------------------------------- */
+
+syncProfileInput.addEventListener(
+  "change",
+  async () => {
+
+    await saveProfile(
+      true
+    );
+
+  }
+);
+
+
+/*
+ * Save when the user leaves the profile
+ * field as well, which makes editing
+ * feel more natural.
+ */
+
+syncProfileInput.addEventListener(
+  "blur",
+  async () => {
+
+    const normalized =
+      normalizeProfile(
+        syncProfileInput.value
+      );
+
+
+    if (
+      normalized !==
+      currentProfile
+    ) {
+
+      await saveProfile(
+        false
+      );
+
+    }
+
+  }
+);
+
+
+/* ---------------------------------------------------------
+   Local refresh
+   --------------------------------------------------------- */
 
 syncButton.addEventListener(
   "click",
@@ -1626,15 +2829,29 @@ syncButton.addEventListener(
 );
 
 
-/* Cloud sync */
+/* ---------------------------------------------------------
+   Cloud sync selected
+   --------------------------------------------------------- */
 
 cloudSyncButton.addEventListener(
   "click",
-  syncToCloudflare
+  syncSelectedToCloudflare
 );
 
 
-/* Save configuration */
+/* ---------------------------------------------------------
+   Cloud sync all
+   --------------------------------------------------------- */
+
+cloudSyncAllButton.addEventListener(
+  "click",
+  syncAllToCloudflare
+);
+
+
+/* ---------------------------------------------------------
+   Save configuration
+   --------------------------------------------------------- */
 
 saveConfigButton.addEventListener(
   "click",
@@ -1642,7 +2859,9 @@ saveConfigButton.addEventListener(
 );
 
 
-/* Automatic sync */
+/* ---------------------------------------------------------
+   Automatic sync
+   --------------------------------------------------------- */
 
 automaticSync.addEventListener(
   "change",
@@ -1650,7 +2869,9 @@ automaticSync.addEventListener(
 );
 
 
-/* Close viewer */
+/* ---------------------------------------------------------
+   Close viewer
+   --------------------------------------------------------- */
 
 closeViewerButton.addEventListener(
   "click",
@@ -1658,7 +2879,9 @@ closeViewerButton.addEventListener(
 );
 
 
-/* Copy */
+/* ---------------------------------------------------------
+   Copy
+   --------------------------------------------------------- */
 
 copyButton.addEventListener(
   "click",
@@ -1666,13 +2889,17 @@ copyButton.addEventListener(
 );
 
 
-/* Viewer download */
+/* ---------------------------------------------------------
+   Viewer download
+   --------------------------------------------------------- */
 
 viewerDownloadButton.addEventListener(
   "click",
   () => {
 
-    if (!currentService) {
+    if (
+      !currentService
+    ) {
 
       showMessage(
         "No cookie service selected.",
@@ -1708,7 +2935,9 @@ document.addEventListener(
 
       await loadNetscapeFiles();
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
 
       console.error(
         "[Cookie Sync] Failed to preload Netscape files:",
@@ -1716,6 +2945,9 @@ document.addEventListener(
       );
 
     }
+
+
+    updateSelectedCount();
 
   }
 );
