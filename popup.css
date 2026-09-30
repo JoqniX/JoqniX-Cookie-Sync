@@ -1,3 +1,7 @@
+/* =========================================================
+   BASE
+   ========================================================= */
+
 * {
   box-sizing: border-box;
 }
@@ -7,6 +11,7 @@ html,
 body {
   margin: 0;
   padding: 0;
+
   width: 360px;
   min-height: 420px;
 
@@ -24,12 +29,19 @@ body {
 
 
 body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 
+/* =========================================================
+   CONTAINER
+   ========================================================= */
+
 .container {
   padding: 20px;
+
+  padding-bottom: 24px;
 }
 
 
@@ -66,7 +78,9 @@ body {
    ========================================================= */
 
 .status-card,
-.services {
+.services,
+.profile-section,
+.cloud-section {
   padding: 14px;
   margin-bottom: 14px;
 
@@ -110,11 +124,102 @@ body {
 
 
 /* =========================================================
+   SECTION HEADERS
+   ========================================================= */
+
+.section-header {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 10px;
+}
+
+
+.section-header h2 {
+  margin: 0;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+.section-header small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #777181;
+
+  font-size: 9px;
+
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   PROFILE
+   ========================================================= */
+
+.profile-fields {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+
+.profile-fields label {
+  color: #858092;
+
+  font-size: 9px;
+}
+
+
+.profile-fields input {
+  width: 100%;
+  height: 31px;
+
+  padding:
+    0 9px;
+
+  background: #0b0910;
+  color: #c9c3d6;
+
+  border: 1px solid #292431;
+  border-radius: 6px;
+
+  outline: none;
+
+  font-family:
+    "Cascadia Code",
+    "Consolas",
+    monospace;
+
+  font-size: 10px;
+}
+
+
+.profile-fields input:focus {
+  border-color: #453b55;
+}
+
+
+.profile-display {
+  color: #777181;
+
+  font-size: 9px;
+}
+
+
+/* =========================================================
    SERVICES
    ========================================================= */
 
 .services h2 {
-  margin: 0 0 10px;
+  margin: 0;
 
   font-size: 12px;
   font-weight: 600;
@@ -132,7 +237,7 @@ body {
   align-items: center;
   justify-content: space-between;
 
-  min-height: 38px;
+  min-height: 42px;
 }
 
 
@@ -146,14 +251,55 @@ body {
 
   align-items: center;
 
+  gap: 8px;
+
+  min-width: 0;
+}
+
+
+/* =========================================================
+   SERVICE CHECKBOXES
+   ========================================================= */
+
+.service-selector {
+  display: flex;
+
+  align-items: center;
+
   gap: 7px;
+
+  min-width: 0;
+
+  cursor: pointer;
+
+  user-select: none;
+}
+
+
+.service-checkbox {
+  width: 14px;
+  height: 14px;
+
+  margin: 0;
+
+  flex-shrink: 0;
+
+  accent-color: #8f7ac4;
+
+  cursor: pointer;
 }
 
 
 .service-name {
   font-size: 13px;
+
+  white-space: nowrap;
 }
 
+
+/* =========================================================
+   SERVICE ACTIONS
+   ========================================================= */
 
 .service-actions {
   display: flex;
@@ -161,6 +307,8 @@ body {
   align-items: center;
 
   gap: 6px;
+
+  flex-shrink: 0;
 }
 
 
@@ -182,6 +330,8 @@ body {
   font-size: 10px;
 
   color: #858092;
+
+  white-space: nowrap;
 }
 
 
@@ -192,6 +342,51 @@ body {
 
 .indicator.disconnected {
   color: #f08888;
+}
+
+
+/* =========================================================
+   SERVICE SELECTION ACTIONS
+   ========================================================= */
+
+.selection-actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 5px;
+}
+
+
+.small-button {
+  width: auto;
+  height: 25px;
+
+  padding:
+    0 7px;
+
+  background: #211d2b;
+  color: #aaa4b8;
+
+  border: 1px solid #342e40;
+  border-radius: 6px;
+
+  font-size: 9px;
+}
+
+
+.small-button:hover {
+  background: #2b2637;
+}
+
+
+.small-button.secondary {
+  background: #191620;
+}
+
+
+.small-button:disabled {
+  opacity: 0.4;
 }
 
 
@@ -278,30 +473,6 @@ button:disabled {
 
 .cloud-section {
   margin-top: 14px;
-  padding: 14px;
-
-  background: #15121e;
-
-  border: 1px solid #272230;
-  border-radius: 12px;
-}
-
-
-.section-header {
-  display: flex;
-
-  align-items: center;
-  justify-content: space-between;
-
-  margin-bottom: 10px;
-}
-
-
-.section-header h2 {
-  margin: 0;
-
-  font-size: 13px;
-  font-weight: 600;
 }
 
 
@@ -349,7 +520,9 @@ button:disabled {
 }
 
 
-/* Worker health */
+/* =========================================================
+   WORKER HEALTH
+   ========================================================= */
 
 .health-display.connected {
   color: #7ee787;
@@ -361,13 +534,29 @@ button:disabled {
 }
 
 
-/* Cloud sync button */
+/* =========================================================
+   CLOUD SYNC ACTIONS
+   ========================================================= */
+
+.cloud-sync-actions {
+  display: flex;
+
+  gap: 7px;
+
+  margin-top: 2px;
+}
+
+
+.cloud-sync-actions .cloud-sync-button {
+  flex: 1;
+
+  margin-top: 0;
+}
+
 
 .cloud-sync-button {
   width: 100%;
   height: 36px;
-
-  margin-top: 2px;
 
   background: #211d2b;
   color: #ddd7ed;
@@ -381,6 +570,17 @@ button:disabled {
 
 .cloud-sync-button:hover {
   background: #2b2637;
+}
+
+
+.cloud-sync-button.secondary {
+  background: #191620;
+  color: #aaa4b8;
+}
+
+
+.cloud-sync-button.secondary:hover {
+  background: #25202f;
 }
 
 
@@ -812,5 +1012,5 @@ button:disabled {
   background: #211d2b;
   color: #ddd7ed;
 
-  border: 1px solid #342e40;
 }
+  border: 1px solid #342e40;
