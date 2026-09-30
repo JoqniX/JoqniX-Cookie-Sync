@@ -1,6 +1,6 @@
 // JoqniX Cookie Sync
 // Background Service Worker
-// Version: 0.4.0
+// Version: 0.5.0
 
 
 /* =========================================================
@@ -11,16 +11,30 @@ const SUPPORTED_DOMAINS = [
   "youtube.com",
   "google.com",
   "twitch.tv",
-  "kick.com"
+  "kick.com",
+  "meldstudio.co",
+  "casterlabs.co"
 ];
 
+const DEFAULT_PROFILE =
+  "default";
+
+const DEFAULT_SELECTED_DOMAINS = [
+  ...SUPPORTED_DOMAINS
+];
 
 const DEFAULT_CONFIG = {
   workerUrl:
     "https://api.joqnix.space/cookies",
 
   syncAutomatically:
-    false
+    false,
+
+  syncProfile:
+    DEFAULT_PROFILE,
+
+  selectedDomains:
+    DEFAULT_SELECTED_DOMAINS
 };
 
 
@@ -49,15 +63,15 @@ let syncTimer = null;
    DOMAIN HELPERS
    ========================================================= */
 
-function normalizeDomain(domain) {
-
+function normalizeDomain(
+  domain
+) {
   if (
     typeof domain !==
     "string"
   ) {
     return "";
   }
-
 
   return domain
     .replace(
@@ -68,8 +82,9 @@ function normalizeDomain(domain) {
 }
 
 
-function isSupportedCookie(cookie) {
-
+function isSupportedCookie(
+  cookie
+) {
   if (
     !cookie ||
     typeof cookie.domain !==
@@ -78,12 +93,10 @@ function isSupportedCookie(cookie) {
     return false;
   }
 
-
   const domain =
     normalizeDomain(
       cookie.domain
     );
-
 
   return SUPPORTED_DOMAINS.some(
     supportedDomain =>
@@ -96,8 +109,9 @@ function isSupportedCookie(cookie) {
 }
 
 
-function getCookieService(cookie) {
-
+function getCookieService(
+  cookie
+) {
   if (
     !cookie ||
     typeof cookie.domain !==
@@ -106,21 +120,118 @@ function getCookieService(cookie) {
     return null;
   }
 
-
   const domain =
     normalizeDomain(
       cookie.domain
     );
 
+  return (
+    SUPPORTED_DOMAINS.find(
+      supportedDomain =>
+        domain ===
+          supportedDomain ||
+        domain.endsWith(
+          `.${supportedDomain}`
+        )
+    ) || null
+  );
+}
 
-  return SUPPORTED_DOMAINS.find(
-    supportedDomain =>
-      domain ===
-        supportedDomain ||
-      domain.endsWith(
-        `.${supportedDomain}`
-      )
-  ) || null;
+
+/* =========================================================
+   PROFILE HELPERS
+   ========================================================= */
+
+function normalizeProfile(
+  profile
+) {
+  if (
+    typeof profile !==
+    "string"
+  ) {
+    return "";
+  }
+
+  return profile
+    .trim()
+    .toLowerCase()
+    .replace(
+      /[^a-z0-9_-]+/g,
+      "-"
+    )
+    .replace(
+      /^[-_]+|[-_]+$/g,
+      ""
+    )
+    .slice(
+      0,
+      64
+    );
+}
+
+
+function getProfile(
+  profile
+) {
+  const normalized =
+    normalizeProfile(
+      profile
+    );
+
+  return (
+    normalized ||
+    DEFAULT_PROFILE
+  );
+}
+
+
+function normalizeSelectedDomains(
+  selectedDomains
+) {
+  if (
+    !Array.isArray(
+      selectedDomains
+    )
+  ) {
+    return [
+      ...DEFAULT_SELECTED_DOMAINS
+    ];
+  }
+
+  return [
+    ...new Set(
+      selectedDomains
+        .map(
+          domain =>
+            normalizeDomain(
+              domain
+            )
+        )
+        .filter(
+          domain =>
+            SUPPORTED_DOMAINS.includes(
+              domain
+            )
+        )
+    )
+  ];
+}
+
+
+function getSelectedDomains(
+  selectedDomains
+) {
+  const normalized =
+    normalizeSelectedDomains(
+      selectedDomains
+    );
+
+  /*
+   * Never allow an empty selection to
+   * accidentally perform a cloud sync.
+   */
+
+  return normalized;
 }
 
 
@@ -140,22 +251,20 @@ function getCookieService(cookie) {
  * - google.com
  * - twitch.tv
  * - kick.com
+ * - meldstudio.co
+ * - casterlabs.co
  *
  * This includes supported subdomains.
  */
 
 async function getSupportedCookies() {
-
   try {
-
     const cookies =
       await chrome.cookies.getAll({});
-
 
     return cookies.filter(
       isSupportedCookie
     );
-
 
   } catch (error) {
 
@@ -163,7 +272,6 @@ async function getSupportedCookies() {
       "[Cookie Sync] Failed to read browser cookies:",
       error
     );
-
 
     throw error;
   }
@@ -174,10 +282,10 @@ async function getSupportedCookies() {
    STRUCTURED COOKIE SERIALIZATION
    ========================================================= */
 
-function serializeCookie(cookie) {
-
+function serializeCookie(
+  cookie
+) {
   return {
-
     name:
       cookie.name,
 
@@ -207,7 +315,9 @@ function serializeCookie(cookie) {
       cookie.session,
 
     hostOnly:
-      !cookie.domain.startsWith(".")
+      !cookie.domain.startsWith(
+        "."
+      )
   };
 }
 
@@ -216,11 +326,11 @@ function serializeCookie(cookie) {
    NETSCAPE EXPORT
    ========================================================= */
 
-function cookieToNetscape(cookie) {
-
+function cookieToNetscape(
+  cookie
+) {
   let domain =
     cookie.domain;
-
 
   /*
    * Netscape cookie files represent
@@ -229,12 +339,12 @@ function cookieToNetscape(cookie) {
    * #HttpOnly_<domain>
    */
 
-  if (cookie.httpOnly) {
-
+  if (
+    cookie.httpOnly
+  ) {
     domain =
       `#HttpOnly_${domain}`;
   }
-
 
   /*
    * Chrome normally exposes a leading dot
@@ -246,16 +356,13 @@ function cookieToNetscape(cookie) {
       ? "TRUE"
       : "FALSE";
 
-
   const path =
     cookie.path || "/";
-
 
   const secure =
     cookie.secure
       ? "TRUE"
       : "FALSE";
-
 
   /*
    * Session cookies use expiration 0.
@@ -265,17 +372,15 @@ function cookieToNetscape(cookie) {
     cookie.session
       ? "0"
       : Math.floor(
-          cookie.expirationDate || 0
+          cookie.expirationDate ||
+          0
         );
-
 
   const name =
     cookie.name || "";
 
-
   const value =
     cookie.value || "";
-
 
   return [
     domain,
@@ -293,19 +398,12 @@ function cookiesToNetscape(
   cookies,
   domainName
 ) {
-
   const header = [
-
     "# Netscape HTTP Cookie File",
-
     "# This file was generated by JoqniX Cookie Sync",
-
     `# Domain: ${domainName}`,
-
     ""
-
   ].join("\n");
-
 
   /*
    * Stable ordering makes exports
@@ -321,19 +419,16 @@ function cookiesToNetscape(
             b.domain
           );
 
-
         if (
           domainCompare !== 0
         ) {
           return domainCompare;
         }
 
-
         const pathCompare =
           a.path.localeCompare(
             b.path
           );
-
 
         if (
           pathCompare !== 0
@@ -341,19 +436,16 @@ function cookiesToNetscape(
           return pathCompare;
         }
 
-
         return a.name.localeCompare(
           b.name
         );
       }
     );
 
-
   const lines =
     sortedCookies.map(
       cookieToNetscape
     );
-
 
   return (
     `${header}\n` +
@@ -365,9 +457,7 @@ function cookiesToNetscape(
 function generateNetscapeFiles(
   cookies
 ) {
-
   const files = {};
-
 
   for (
     const domain
@@ -382,14 +472,12 @@ function generateNetscapeFiles(
           ) === domain
       );
 
-
     files[domain] =
       cookiesToNetscape(
         domainCookies,
         domain
       );
   }
-
 
   return files;
 }
@@ -402,9 +490,7 @@ function generateNetscapeFiles(
 function generateCookieCounts(
   cookies
 ) {
-
   const counts = {};
-
 
   for (
     const domain
@@ -420,7 +506,6 @@ function generateCookieCounts(
       ).length;
   }
 
-
   return counts;
 }
 
@@ -430,10 +515,8 @@ function generateCookieCounts(
    ========================================================= */
 
 async function buildSnapshot() {
-
   const cookies =
     await getSupportedCookies();
-
 
   /*
    * Keep the complete browser cookie
@@ -445,7 +528,6 @@ async function buildSnapshot() {
       serializeCookie
     );
 
-
   /*
    * Generate Netscape representations
    * separately for compatibility.
@@ -456,15 +538,12 @@ async function buildSnapshot() {
       cookies
     );
 
-
   const cookieCounts =
     generateCookieCounts(
       cookies
     );
 
-
   return {
-
     cookies:
       serializedCookies,
 
@@ -477,7 +556,66 @@ async function buildSnapshot() {
 
     timestamp:
       Date.now()
+  };
+}
 
+
+/* =========================================================
+   FILTER SNAPSHOT FOR SELECTED DOMAINS
+   ========================================================= */
+
+function filterSnapshotForDomains(
+  snapshot,
+  selectedDomains
+) {
+  const selectedSet =
+    new Set(
+      selectedDomains
+    );
+
+  const cookies =
+    snapshot.cookies.filter(
+      cookie =>
+        selectedSet.has(
+          getCookieService(
+            cookie
+          )
+        )
+    );
+
+  const netscapeFiles = {};
+
+  const cookieCounts = {};
+
+  for (
+    const domain
+    of selectedDomains
+  ) {
+    netscapeFiles[domain] =
+      snapshot.netscapeFiles?.[
+        domain
+      ] || "";
+
+    cookieCounts[domain] =
+      snapshot.cookieCounts?.[
+        domain
+      ] || 0;
+  }
+
+  return {
+    cookies,
+
+    netscapeFiles,
+
+    cookieCounts,
+
+    totalCookies:
+      cookies.length,
+
+    timestamp:
+      snapshot.timestamp,
+
+    selectedDomains
   };
 }
 
@@ -487,10 +625,8 @@ async function buildSnapshot() {
    ========================================================= */
 
 async function saveCookieSnapshot() {
-
   const snapshot =
     await buildSnapshot();
-
 
   await chrome.storage.local.set({
 
@@ -508,14 +644,11 @@ async function saveCookieSnapshot() {
 
     lastLocalSync:
       snapshot.timestamp
-
   });
-
 
   console.log(
     `[Cookie Sync] Local snapshot updated: ${snapshot.totalCookies} cookies`
   );
-
 
   return snapshot;
 }
@@ -526,14 +659,14 @@ async function saveCookieSnapshot() {
    ========================================================= */
 
 async function getConfig() {
-
   const data =
     await chrome.storage.local.get([
       "workerUrl",
       "workerToken",
-      "syncAutomatically"
+      "syncAutomatically",
+      "syncProfile",
+      "selectedDomains"
     ]);
-
 
   return {
 
@@ -547,8 +680,19 @@ async function getConfig() {
 
     syncAutomatically:
       data.syncAutomatically ??
-      DEFAULT_CONFIG.syncAutomatically
+      DEFAULT_CONFIG.syncAutomatically,
 
+    syncProfile:
+      getProfile(
+        data.syncProfile ||
+        DEFAULT_CONFIG.syncProfile
+      ),
+
+    selectedDomains:
+      getSelectedDomains(
+        data.selectedDomains ??
+        DEFAULT_CONFIG.selectedDomains
+      )
   };
 }
 
@@ -558,26 +702,34 @@ async function getConfig() {
    ========================================================= */
 
 async function checkCloudflareHealth() {
-
   const config =
     await getConfig();
 
-
-  if (!config.workerUrl) {
-
+  if (
+    !config.workerUrl
+  ) {
     throw new Error(
       "Cloudflare Worker URL is not configured."
     );
   }
 
-
-  if (!config.workerToken) {
-
+  if (
+    !config.workerToken
+  ) {
     throw new Error(
       "Cloudflare sync token is not configured."
     );
   }
 
+  /*
+   * workerUrl is expected to be:
+   *
+   * https://api.joqnix.space/cookies
+   *
+   * Therefore this becomes:
+   *
+   * https://api.joqnix.space/cookies/health
+   */
 
   const healthUrl =
     config.workerUrl
@@ -587,41 +739,33 @@ async function checkCloudflareHealth() {
       ) +
       "/health";
 
-
   const response =
     await fetch(
       healthUrl,
       {
-
         method:
           "GET",
 
         headers: {
-
           "Authorization":
             `Bearer ${config.workerToken}`
-
         }
-
       }
     );
 
-
-  if (!response.ok) {
-
+  if (
+    !response.ok
+  ) {
     const text =
       await response.text();
-
 
     throw new Error(
       `Cloudflare health check failed (${response.status}): ${text}`
     );
   }
 
-
   const result =
     await response.json();
-
 
   return result;
 }
@@ -631,27 +775,27 @@ async function checkCloudflareHealth() {
    CLOUDFLARE SYNC
    ========================================================= */
 
-async function syncToCloudflare() {
-
+async function syncToCloudflare(
+  options = {}
+) {
   const config =
     await getConfig();
 
-
-  if (!config.workerUrl) {
-
+  if (
+    !config.workerUrl
+  ) {
     throw new Error(
       "Cloudflare Worker URL is not configured."
     );
   }
 
-
-  if (!config.workerToken) {
-
+  if (
+    !config.workerToken
+  ) {
     throw new Error(
       "Cloudflare sync token is not configured."
     );
   }
-
 
   /*
    * Always build a fresh complete snapshot
@@ -662,10 +806,52 @@ async function syncToCloudflare() {
     await buildSnapshot();
 
 
+  /*
+   * Sync All overrides the configured
+   * service selection.
+   */
+
+  const syncAll =
+    Boolean(
+      options.syncAll
+    );
+
+  const selectedDomains =
+    syncAll
+      ? [
+          ...SUPPORTED_DOMAINS
+        ]
+      : getSelectedDomains(
+          config.selectedDomains
+        );
+
+
+  if (
+    selectedDomains.length ===
+    0
+  ) {
+    throw new Error(
+      "No cookie services are selected for synchronization."
+    );
+  }
+
+
+  /*
+   * Only send the selected services
+   * to Cloudflare.
+   */
+
+  const selectedSnapshot =
+    filterSnapshotForDomains(
+      snapshot,
+      selectedDomains
+    );
+
+
   const payload = {
 
     version:
-      1,
+      2,
 
     source:
       "joqnix-cookie-sync",
@@ -673,26 +859,32 @@ async function syncToCloudflare() {
     timestamp:
       snapshot.timestamp,
 
+    profile:
+      config.syncProfile,
+
+    selectedDomains,
+
     totalCookies:
-      snapshot.totalCookies,
+      selectedSnapshot.totalCookies,
 
     cookieCounts:
-      snapshot.cookieCounts,
+      selectedSnapshot.cookieCounts,
 
     /*
-     * COMPLETE structured browser cookies.
+     * COMPLETE structured browser cookies
+     * for the selected services.
      */
 
     cookies:
-      snapshot.cookies,
+      selectedSnapshot.cookies,
 
     /*
-     * COMPLETE Netscape representations.
+     * COMPLETE Netscape representations
+     * for the selected services.
      */
 
     netscapeFiles:
-      snapshot.netscapeFiles
-
+      selectedSnapshot.netscapeFiles
   };
 
 
@@ -700,34 +892,30 @@ async function syncToCloudflare() {
     await fetch(
       config.workerUrl,
       {
-
         method:
           "POST",
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Authorization":
             `Bearer ${config.workerToken}`
-
         },
 
         body:
           JSON.stringify(
             payload
           )
-
       }
     );
 
 
-  if (!response.ok) {
-
+  if (
+    !response.ok
+  ) {
     const text =
       await response.text();
-
 
     throw new Error(
       `Cloudflare sync failed (${response.status}): ${text}`
@@ -745,13 +933,18 @@ async function syncToCloudflare() {
       snapshot.timestamp,
 
     lastCloudSyncResult:
-      result
+      result,
 
+    lastCloudSyncProfile:
+      config.syncProfile,
+
+    lastCloudSyncSelectedDomains:
+      selectedDomains
   });
 
 
   console.log(
-    "[Cookie Sync] Cloudflare sync completed."
+    `[Cookie Sync] Cloudflare sync completed: profile=${config.syncProfile}, domains=${selectedDomains.join(", ")}`
   );
 
 
@@ -759,8 +952,14 @@ async function syncToCloudflare() {
 
     snapshot,
 
-    result
+    selectedSnapshot,
 
+    selectedDomains,
+
+    profile:
+      config.syncProfile,
+
+    result
   };
 }
 
@@ -777,10 +976,8 @@ async function syncToCloudflare() {
  */
 
 async function configureAutomaticSyncAlarm() {
-
   const config =
     await getConfig();
-
 
   await chrome.alarms.clear(
     AUTOMATIC_SYNC_ALARM
@@ -790,7 +987,6 @@ async function configureAutomaticSyncAlarm() {
   if (
     !config.syncAutomatically
   ) {
-
     return;
   }
 
@@ -818,9 +1014,9 @@ async function configureAutomaticSyncAlarm() {
  */
 
 function scheduleAutomaticCloudSync() {
-
-  if (syncTimer) {
-
+  if (
+    syncTimer
+  ) {
     clearTimeout(
       syncTimer
     );
@@ -832,7 +1028,6 @@ function scheduleAutomaticCloudSync() {
       async () => {
 
         syncTimer = null;
-
 
         try {
 
@@ -849,7 +1044,6 @@ function scheduleAutomaticCloudSync() {
 
           await syncToCloudflare();
 
-
         } catch (error) {
 
           console.error(
@@ -859,7 +1053,6 @@ function scheduleAutomaticCloudSync() {
         }
 
       },
-
       COOKIE_CHANGE_DEBOUNCE_MS
     );
 }
@@ -889,6 +1082,7 @@ chrome.alarms.onAlarm.addListener(
       if (
         !config.syncAutomatically
       ) {
+
         await chrome.alarms.clear(
           AUTOMATIC_SYNC_ALARM
         );
@@ -938,7 +1132,6 @@ chrome.cookies.onChanged.addListener(
     console.log(
       "[Cookie Sync] Supported cookie changed:",
       {
-
         cause:
           changeInfo.cause,
 
@@ -953,7 +1146,6 @@ chrome.cookies.onChanged.addListener(
 
         path:
           cookie.path
-
       }
     );
 
@@ -979,7 +1171,6 @@ chrome.cookies.onChanged.addListener(
       if (
         config.syncAutomatically
       ) {
-
         scheduleAutomaticCloudSync();
       }
 
@@ -1007,7 +1198,6 @@ chrome.runtime.onMessage.addListener(
     sendResponse
   ) => {
 
-
     if (
       !message ||
       typeof message.type !==
@@ -1028,35 +1218,39 @@ chrome.runtime.onMessage.addListener(
 
       getSupportedCookies()
 
-        .then(cookies => {
+        .then(
+          cookies => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            cookies:
-              cookies.map(
-                serializeCookie
-              )
+              cookies:
+                cookies.map(
+                  serializeCookie
+                )
 
-          });
+            });
 
-        })
+          }
+        )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1074,39 +1268,43 @@ chrome.runtime.onMessage.addListener(
 
       saveCookieSnapshot()
 
-        .then(snapshot => {
+        .then(
+          snapshot => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            count:
-              snapshot.totalCookies,
+              count:
+                snapshot.totalCookies,
 
-            cookieCounts:
-              snapshot.cookieCounts,
+              cookieCounts:
+                snapshot.cookieCounts,
 
-            timestamp:
-              snapshot.timestamp
+              timestamp:
+                snapshot.timestamp
 
-          });
+            });
 
-        })
+          }
+        )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1124,72 +1322,94 @@ chrome.runtime.onMessage.addListener(
 
       chrome.storage.local
         .get([
-
           "cookieSnapshot",
-
           "cookieCounts",
-
           "totalCookies",
-
           "lastLocalSync",
-
           "lastCloudSync",
-
           "lastCloudSyncResult",
-
-          "syncAutomatically"
-
+          "lastCloudSyncProfile",
+          "lastCloudSyncSelectedDomains",
+          "syncAutomatically",
+          "syncProfile",
+          "selectedDomains"
         ])
 
-        .then(data => {
+        .then(
+          data => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            cookieCount:
-              data.totalCookies ??
-              data.cookieSnapshot?.length ??
-              0,
+              cookieCount:
+                data.totalCookies ??
+                data.cookieSnapshot?.length ??
+                0,
 
-            cookieCounts:
-              data.cookieCounts ??
-              {},
+              cookieCounts:
+                data.cookieCounts ??
+                {},
 
-            lastLocalSync:
-              data.lastLocalSync ??
-              null,
+              lastLocalSync:
+                data.lastLocalSync ??
+                null,
 
-            lastCloudSync:
-              data.lastCloudSync ??
-              null,
+              lastCloudSync:
+                data.lastCloudSync ??
+                null,
 
-            lastCloudSyncResult:
-              data.lastCloudSyncResult ??
-              null,
+              lastCloudSyncResult:
+                data.lastCloudSyncResult ??
+                null,
 
-            syncAutomatically:
-              data.syncAutomatically ??
-              false
+              lastCloudSyncProfile:
+                data.lastCloudSyncProfile ??
+                data.syncProfile ??
+                DEFAULT_PROFILE,
 
-          });
+              lastCloudSyncSelectedDomains:
+                data.lastCloudSyncSelectedDomains ??
+                data.selectedDomains ??
+                DEFAULT_SELECTED_DOMAINS,
 
-        })
+              syncAutomatically:
+                data.syncAutomatically ??
+                false,
 
-        .catch(error => {
+              syncProfile:
+                getProfile(
+                  data.syncProfile ||
+                  DEFAULT_PROFILE
+                ),
 
-          sendResponse({
+              selectedDomains:
+                getSelectedDomains(
+                  data.selectedDomains ??
+                  DEFAULT_SELECTED_DOMAINS
+                )
 
-            success:
-              false,
+            });
 
-            error:
-              error.message
+          }
+        )
 
-          });
+        .catch(
+          error => {
 
-        });
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
 
 
       return true;
@@ -1207,11 +1427,8 @@ chrome.runtime.onMessage.addListener(
 
       chrome.storage.local
         .get([
-
           "netscapeFiles",
-
           "lastLocalSync"
-
         ])
 
         .then(
@@ -1260,19 +1477,21 @@ chrome.runtime.onMessage.addListener(
           }
         )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1290,41 +1509,45 @@ chrome.runtime.onMessage.addListener(
 
       getSupportedCookies()
 
-        .then(cookies => {
+        .then(
+          cookies => {
 
-          const files =
-            generateNetscapeFiles(
-              cookies
-            );
+            const files =
+              generateNetscapeFiles(
+                cookies
+              );
 
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            files,
+              files,
 
-            cookieCount:
-              cookies.length
+              cookieCount:
+                cookies.length
 
-          });
+            });
 
-        })
+          }
+        )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1340,47 +1563,200 @@ chrome.runtime.onMessage.addListener(
       "SYNC_CLOUD"
     ) {
 
-      syncToCloudflare()
+      syncToCloudflare({
+        syncAll:
+          Boolean(
+            message.syncAll
+          )
+      })
 
-        .then(result => {
+        .then(
+          result => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            count:
-              result.snapshot
-                .totalCookies,
+              count:
+                result.selectedSnapshot
+                  .totalCookies,
 
-            cookieCounts:
-              result.snapshot
-                .cookieCounts,
+              cookieCounts:
+                result.selectedSnapshot
+                  .cookieCounts,
 
-            timestamp:
-              result.snapshot
-                .timestamp,
+              selectedDomains:
+                result.selectedDomains,
 
-            result:
-              result.result
+              profile:
+                result.profile,
 
-          });
+              timestamp:
+                result.snapshot
+                  .timestamp,
 
-        })
+              result:
+                result.result
 
-        .catch(error => {
+            });
 
-          sendResponse({
+          }
+        )
 
-            success:
-              false,
+        .catch(
+          error => {
 
-            error:
-              error.message
+            sendResponse({
 
-          });
+              success:
+                false,
 
-        });
+              error:
+                error.message
+
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SYNC SELECTED
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SYNC_SELECTED"
+    ) {
+
+      syncToCloudflare({
+        syncAll:
+          false
+      })
+
+        .then(
+          result => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              count:
+                result.selectedSnapshot
+                  .totalCookies,
+
+              cookieCounts:
+                result.selectedSnapshot
+                  .cookieCounts,
+
+              selectedDomains:
+                result.selectedDomains,
+
+              profile:
+                result.profile,
+
+              timestamp:
+                result.snapshot
+                  .timestamp,
+
+              result:
+                result.result
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SYNC ALL
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SYNC_ALL"
+    ) {
+
+      syncToCloudflare({
+        syncAll:
+          true
+      })
+
+        .then(
+          result => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              count:
+                result.selectedSnapshot
+                  .totalCookies,
+
+              cookieCounts:
+                result.selectedSnapshot
+                  .cookieCounts,
+
+              selectedDomains:
+                result.selectedDomains,
+
+              profile:
+                result.profile,
+
+              timestamp:
+                result.snapshot
+                  .timestamp,
+
+              result:
+                result.result
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
 
 
       return true;
@@ -1398,32 +1774,36 @@ chrome.runtime.onMessage.addListener(
 
       checkCloudflareHealth()
 
-        .then(result => {
+        .then(
+          result => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            result
+              result
 
-          });
+            });
 
-        })
+          }
+        )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1441,41 +1821,51 @@ chrome.runtime.onMessage.addListener(
 
       getConfig()
 
-        .then(config => {
+        .then(
+          config => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              true,
+              success:
+                true,
 
-            workerUrl:
-              config.workerUrl,
+              workerUrl:
+                config.workerUrl,
 
-            hasToken:
-              Boolean(
-                config.workerToken
-              ),
+              hasToken:
+                Boolean(
+                  config.workerToken
+                ),
 
-            syncAutomatically:
-              config.syncAutomatically
+              syncAutomatically:
+                config.syncAutomatically,
 
-          });
+              syncProfile:
+                config.syncProfile,
 
-        })
+              selectedDomains:
+                config.selectedDomains
 
-        .catch(error => {
+            });
 
-          sendResponse({
+          }
+        )
 
-            success:
-              false,
+        .catch(
+          error => {
 
-            error:
-              error.message
+            sendResponse({
 
-          });
+              success:
+                false,
 
-        });
+              error:
+                error.message
+
+            });
+
+          }
+        );
 
 
       return true;
@@ -1493,13 +1883,11 @@ chrome.runtime.onMessage.addListener(
 
       chrome.storage.local
         .get([
-
           "workerUrl",
-
           "workerToken",
-
-          "syncAutomatically"
-
+          "syncAutomatically",
+          "syncProfile",
+          "selectedDomains"
         ])
 
         .then(
@@ -1543,13 +1931,41 @@ chrome.runtime.onMessage.addListener(
                   );
 
 
+            const syncProfile =
+              getProfile(
+                typeof message.syncProfile ===
+                  "string"
+                  ? message.syncProfile
+                  : (
+                      existing.syncProfile ||
+                      DEFAULT_CONFIG.syncProfile
+                    )
+              );
+
+
+            const selectedDomains =
+              message.selectedDomains !==
+                undefined
+                ? getSelectedDomains(
+                    message.selectedDomains
+                  )
+                : getSelectedDomains(
+                    existing.selectedDomains ??
+                    DEFAULT_CONFIG.selectedDomains
+                  );
+
+
             await chrome.storage.local.set({
 
               workerUrl,
 
               workerToken,
 
-              syncAutomatically
+              syncAutomatically,
+
+              syncProfile,
+
+              selectedDomains
 
             });
 
@@ -1574,26 +1990,32 @@ chrome.runtime.onMessage.addListener(
                   workerToken
                 ),
 
-              syncAutomatically
+              syncAutomatically,
+
+              syncProfile,
+
+              selectedDomains
 
             });
 
           }
         )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1617,10 +2039,8 @@ chrome.runtime.onMessage.addListener(
 
       chrome.storage.local
         .set({
-
           syncAutomatically:
             enabled
-
         })
 
         .then(
@@ -1642,19 +2062,260 @@ chrome.runtime.onMessage.addListener(
           }
         )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SET SYNC PROFILE
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SET_SYNC_PROFILE"
+    ) {
+
+      const syncProfile =
+        getProfile(
+          message.profile
+        );
+
+
+      chrome.storage.local
+        .set({
+          syncProfile
+        })
+
+        .then(
+          () => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              syncProfile
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SET SELECTED DOMAINS
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SET_SELECTED_DOMAINS"
+    ) {
+
+      const selectedDomains =
+        getSelectedDomains(
+          message.selectedDomains
+        );
+
+
+      if (
+        selectedDomains.length ===
+        0
+      ) {
+
+        sendResponse({
+
+          success:
+            false,
+
+          error:
+            "At least one cookie service must be selected."
 
         });
+
+        return true;
+      }
+
+
+      chrome.storage.local
+        .set({
+          selectedDomains
+        })
+
+        .then(
+          () => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              selectedDomains
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       SELECT ALL DOMAINS
+       ===================================================== */
+
+    if (
+      message.type ===
+      "SELECT_ALL_DOMAINS"
+    ) {
+
+      const selectedDomains =
+        [
+          ...SUPPORTED_DOMAINS
+        ];
+
+
+      chrome.storage.local
+        .set({
+          selectedDomains
+        })
+
+        .then(
+          () => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              selectedDomains
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* =====================================================
+       CLEAR SELECTED DOMAINS
+       ===================================================== */
+
+    if (
+      message.type ===
+      "CLEAR_SELECTED_DOMAINS"
+    ) {
+
+      chrome.storage.local
+        .set({
+          selectedDomains:
+            []
+        })
+
+        .then(
+          () => {
+
+            sendResponse({
+
+              success:
+                true,
+
+              selectedDomains:
+                []
+
+            });
+
+          }
+        )
+
+        .catch(
+          error => {
+
+            sendResponse({
+
+              success:
+                false,
+
+              error:
+                error.message
+
+            });
+
+          }
+        );
 
 
       return true;
@@ -1690,7 +2351,6 @@ chrome.runtime.onMessage.addListener(
 
         });
 
-
         return true;
       }
 
@@ -1712,7 +2372,9 @@ chrome.runtime.onMessage.addListener(
              * no local Netscape snapshot exists.
              */
 
-            if (!files) {
+            if (
+              !files
+            ) {
 
               const snapshot =
                 await saveCookieSnapshot();
@@ -1724,11 +2386,14 @@ chrome.runtime.onMessage.addListener(
 
 
             const content =
-              files?.[service];
+              files?.[
+                service
+              ];
 
 
-            if (!content) {
-
+            if (
+              !content
+            ) {
               throw new Error(
                 `No cookie file exists for ${service}.`
               );
@@ -1737,8 +2402,9 @@ chrome.runtime.onMessage.addListener(
 
             /*
              * The popup creates the Blob URL
-             * because URL.createObjectURL() is not
-             * available inside the MV3 service worker.
+             * because URL.createObjectURL()
+             * is not available inside the
+             * MV3 service worker.
              */
 
             sendResponse({
@@ -1758,19 +2424,21 @@ chrome.runtime.onMessage.addListener(
           }
         )
 
-        .catch(error => {
+        .catch(
+          error => {
 
-          sendResponse({
+            sendResponse({
 
-            success:
-              false,
+              success:
+                false,
 
-            error:
-              error.message
+              error:
+                error.message
 
-          });
+            });
 
-        });
+          }
+        );
 
 
       return true;
@@ -1841,6 +2509,45 @@ chrome.runtime.onInstalled.addListener(
 
 
     try {
+
+      /*
+       * Initialize new configuration values
+       * without overwriting existing settings.
+       */
+
+      const existing =
+        await chrome.storage.local.get([
+          "syncProfile",
+          "selectedDomains"
+        ]);
+
+
+      const syncProfile =
+        getProfile(
+          existing.syncProfile ||
+          DEFAULT_PROFILE
+        );
+
+
+      const selectedDomains =
+        existing.selectedDomains !==
+          undefined
+          ? getSelectedDomains(
+              existing.selectedDomains
+            )
+          : [
+              ...DEFAULT_SELECTED_DOMAINS
+            ];
+
+
+      await chrome.storage.local.set({
+
+        syncProfile,
+
+        selectedDomains
+
+      });
+
 
       await saveCookieSnapshot();
 
