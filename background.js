@@ -13,7 +13,8 @@ const SUPPORTED_DOMAINS = [
   "twitch.tv",
   "kick.com",
   "meldstudio.co",
-  "casterlabs.co"
+  "casterlabs.co",
+  "bilibili.com"
 ];
 
 
@@ -322,6 +323,7 @@ function getSelectedDomains(
  * - kick.com
  * - meldstudio.co
  * - casterlabs.co
+ * - bilibili.com
  *
  * This includes supported subdomains.
  */

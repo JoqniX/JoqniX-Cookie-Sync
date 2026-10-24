@@ -30,6 +30,9 @@
     "https://*.casterlabs.co/*",
     "https://casterlabs.co/*",
 
+    "https://*.bilibili.com/*",
+    "https://bilibili.com/*",
+
     "https://api.joqnix.space/*"
   ],
   "background": {

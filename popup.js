@@ -13,7 +13,8 @@ const SUPPORTED_DOMAINS = [
   "twitch.tv",
   "kick.com",
   "meldstudio.co",
-  "casterlabs.co"
+  "casterlabs.co",
+  "bilibili.com"
 ];
 
 
@@ -170,6 +171,21 @@ const serviceElements = {
     count:
       document.getElementById(
         "casterlabs-count"
+      )
+
+  },
+
+
+  "bilibili.com": {
+
+    status:
+      document.getElementById(
+        "bilibili-status"
+      ),
+
+    count:
+      document.getElementById(
+        "bilibili-count"
       )
 
   }
@@ -1600,7 +1616,10 @@ function getDisplayName(
       "Meld Studio",
 
     "casterlabs.co":
-      "Casterlabs"
+      "Casterlabs",
+
+    "bilibili.com":
+      "Bilibili"
 
   };
 
