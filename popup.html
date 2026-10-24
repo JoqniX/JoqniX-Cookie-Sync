@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -15,11 +16,14 @@
     rel="stylesheet"
     href="popup.css"
   >
+
 </head>
+
 
 <body>
 
   <main class="container">
+
 
     <!-- =====================================================
          HEADER
@@ -27,7 +31,9 @@
 
     <header class="header">
 
-      <h1>JoqniX Cookie Sync</h1>
+      <h1>
+        JoqniX Cookie Sync
+      </h1>
 
       <p>
         Browser session synchronization
@@ -43,38 +49,152 @@
     <section class="status-card">
 
       <div class="status-row">
-        <span>Status</span>
+
+        <span>
+          Status
+        </span>
 
         <strong id="status">
           Checking...
         </strong>
+
       </div>
 
 
       <div class="status-row">
-        <span>Total cookies</span>
+
+        <span>
+          Total cookies
+        </span>
 
         <strong id="cookie-count">
           0
         </strong>
+
       </div>
 
 
       <div class="status-row">
-        <span>Last local sync</span>
+
+        <span>
+          Last local sync
+        </span>
 
         <strong id="last-sync">
           Never
         </strong>
+
       </div>
 
 
       <div class="status-row">
-        <span>Last cloud sync</span>
+
+        <span>
+          Last cloud sync
+        </span>
 
         <strong id="last-cloud-sync">
           Never
         </strong>
+
+      </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         MULTIMELD WATCHDOG
+         ===================================================== -->
+
+    <section
+      id="multimeld-watchdog-section"
+      class="status-card hidden"
+    >
+
+      <div class="section-header">
+
+        <div>
+
+          <h2>
+            MultiMeld
+          </h2>
+
+          <small>
+            VOD profile authentication status
+          </small>
+
+        </div>
+
+        <span
+          id="multimeld-status"
+          class="cloud-status"
+        >
+          Checking
+        </span>
+
+      </div>
+
+
+      <div class="cloud-info">
+
+        <div class="status-row">
+
+          <span>
+            Authentication
+          </span>
+
+          <strong
+            id="multimeld-auth-display"
+            class="health-display"
+          >
+            Checking
+          </strong>
+
+        </div>
+
+
+        <div
+          id="multimeld-reauth-warning"
+          class="message hidden"
+        >
+          MultiMeld authentication needs to be renewed.
+        </div>
+
+
+        <div class="status-row">
+
+          <span>
+            Last checked
+          </span>
+
+          <strong id="multimeld-last-check">
+            Never
+          </strong>
+
+        </div>
+
+      </div>
+
+
+      <div class="cloud-sync-actions">
+
+        <button
+          id="multimeld-refresh-button"
+          class="cloud-sync-button"
+          type="button"
+        >
+          Check MultiMeld
+        </button>
+
+
+        <button
+          id="multimeld-open-button"
+          class="cloud-sync-button secondary"
+          type="button"
+        >
+          Open MultiMeld
+        </button>
+
       </div>
 
     </section>

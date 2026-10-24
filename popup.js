@@ -16,13 +16,26 @@ const SUPPORTED_DOMAINS = [
   "casterlabs.co"
 ];
 
+
 const DEFAULT_PROFILE =
   "default";
 
 
 /* =========================================================
+   MULTIMELD WATCHDOG
+   ========================================================= */
+
+const MULTIMELD_WATCHDOG_STATUS_URL =
+  "https://api.joqnix.space/multistream-watchdog/status";
+
+const MULTIMELD_WATCHDOG_PROFILE =
+  "vod";
+
+
+/* =========================================================
    ELEMENTS
    ========================================================= */
+
 
 /* General status */
 
@@ -31,15 +44,18 @@ const statusElement =
     "status"
   );
 
+
 const cookieCountElement =
   document.getElementById(
     "cookie-count"
   );
 
+
 const lastSyncElement =
   document.getElementById(
     "last-sync"
   );
+
 
 const lastCloudSyncElement =
   document.getElementById(
@@ -55,6 +71,7 @@ const syncProfileInput =
   document.getElementById(
     "sync-profile"
   );
+
 
 const profileDisplay =
   document.getElementById(
@@ -167,15 +184,18 @@ const serviceCheckboxes =
     ".service-checkbox"
   );
 
+
 const selectedCountElement =
   document.getElementById(
     "selected-count"
   );
 
+
 const selectAllButton =
   document.getElementById(
     "select-all-button"
   );
+
 
 const clearAllButton =
   document.getElementById(
@@ -192,64 +212,122 @@ const cloudStatus =
     "cloud-status"
   );
 
+
 const workerDisplay =
   document.getElementById(
     "worker-display"
   );
+
 
 const healthDisplay =
   document.getElementById(
     "health-display"
   );
 
+
 const cloudSyncDisplay =
   document.getElementById(
     "cloud-sync-display"
   );
+
 
 const cloudProfileDisplay =
   document.getElementById(
     "cloud-profile-display"
   );
 
+
 const cloudSelectedDisplay =
   document.getElementById(
     "cloud-selected-display"
   );
+
 
 const cloudSyncButton =
   document.getElementById(
     "cloud-sync-button"
   );
 
+
 const cloudSyncAllButton =
   document.getElementById(
     "cloud-sync-all-button"
   );
+
 
 const automaticSync =
   document.getElementById(
     "automatic-sync"
   );
 
+
 const workerUrlInput =
   document.getElementById(
     "worker-url"
   );
+
 
 const workerTokenInput =
   document.getElementById(
     "worker-token"
   );
 
+
 const tokenStatus =
   document.getElementById(
     "token-status"
   );
 
+
 const saveConfigButton =
   document.getElementById(
     "save-config-button"
+  );
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG ELEMENTS
+   ========================================================= */
+
+const multimeldWatchdogSection =
+  document.getElementById(
+    "multimeld-watchdog-section"
+  );
+
+
+const multimeldStatus =
+  document.getElementById(
+    "multimeld-status"
+  );
+
+
+const multimeldAuthDisplay =
+  document.getElementById(
+    "multimeld-auth-display"
+  );
+
+
+const multimeldReauthWarning =
+  document.getElementById(
+    "multimeld-reauth-warning"
+  );
+
+
+const multimeldLastCheck =
+  document.getElementById(
+    "multimeld-last-check"
+  );
+
+
+const multimeldRefreshButton =
+  document.getElementById(
+    "multimeld-refresh-button"
+  );
+
+
+const multimeldOpenButton =
+  document.getElementById(
+    "multimeld-open-button"
   );
 
 
@@ -261,6 +339,7 @@ const syncButton =
   document.getElementById(
     "sync-button"
   );
+
 
 const messageElement =
   document.getElementById(
@@ -277,30 +356,36 @@ const cookieViewer =
     "cookie-viewer"
   );
 
+
 const viewerTitle =
   document.getElementById(
     "viewer-title"
   );
+
 
 const viewerCount =
   document.getElementById(
     "viewer-count"
   );
 
+
 const cookieOutput =
   document.getElementById(
     "cookie-output"
   );
+
 
 const closeViewerButton =
   document.getElementById(
     "close-viewer"
   );
 
+
 const copyButton =
   document.getElementById(
     "copy-button"
   );
+
 
 const viewerDownloadButton =
   document.getElementById(
@@ -314,10 +399,13 @@ const viewerDownloadButton =
 
 let currentFiles = {};
 
+
 let currentService = null;
+
 
 let currentProfile =
   DEFAULT_PROFILE;
+
 
 let currentSelectedDomains = [
   ...SUPPORTED_DOMAINS
@@ -381,13 +469,16 @@ function formatTimestamp(
   if (
     !timestamp
   ) {
+
     return "Never";
+
   }
 
 
   return new Date(
     timestamp
   ).toLocaleString();
+
 }
 
 
@@ -398,7 +489,9 @@ function shortenUrl(
   if (
     !url
   ) {
+
     return "Not configured";
+
   }
 
 
@@ -429,7 +522,9 @@ function normalizeProfile(
     typeof profile !==
     "string"
   ) {
+
     return DEFAULT_PROFILE;
+
   }
 
 
@@ -455,6 +550,7 @@ function normalizeProfile(
     normalized ||
     DEFAULT_PROFILE
   );
+
 }
 
 
@@ -470,7 +566,9 @@ function updateIndicator(
   if (
     !element
   ) {
+
     return;
+
   }
 
 
@@ -578,6 +676,7 @@ function getSelectedDomainsFromUI() {
           service
         )
     );
+
 }
 
 
@@ -585,6 +684,7 @@ function updateSelectedCount() {
 
   const selected =
     getSelectedDomainsFromUI();
+
 
   const count =
     selected.length;
@@ -625,6 +725,7 @@ function updateSelectedCount() {
 
 
   updateSelectionButtonStates();
+
 }
 
 
@@ -653,6 +754,7 @@ function updateSelectionButtonStates() {
       selectedCount === 0;
 
   }
+
 }
 
 
@@ -685,6 +787,7 @@ function applySelectedDomains(
 
 
   updateSelectedCount();
+
 }
 
 
@@ -723,6 +826,7 @@ async function saveSelectedDomains(
 
   return response.selectedDomains ||
     [];
+
 }
 
 
@@ -769,6 +873,7 @@ async function selectAllServices() {
       "success"
     );
 
+
   } catch (
     error
   ) {
@@ -783,6 +888,7 @@ async function selectAllServices() {
       error.message,
       "error"
     );
+
 
   } finally {
 
@@ -834,6 +940,7 @@ async function clearAllServices() {
       "success"
     );
 
+
   } catch (
     error
   ) {
@@ -848,6 +955,7 @@ async function clearAllServices() {
       error.message,
       "error"
     );
+
 
   } finally {
 
@@ -1008,6 +1116,15 @@ function updateProfileUI(
       normalized;
 
   }
+
+
+  /*
+   * MultiMeld watchdog is only exposed
+   * by the VOD browser profile.
+   */
+
+  updateMultiMeldProfileVisibility();
+
 }
 
 
@@ -1054,6 +1171,16 @@ async function saveProfile(
 
 
     if (
+      currentProfile ===
+      MULTIMELD_WATCHDOG_PROFILE
+    ) {
+
+      void checkMultiMeldWatchdog();
+
+    }
+
+
+    if (
       showSuccess
     ) {
 
@@ -1066,6 +1193,7 @@ async function saveProfile(
 
 
     return currentProfile;
+
 
   } catch (
     error
@@ -1358,6 +1486,7 @@ async function loadNetscapeFiles() {
 
 
   return currentFiles;
+
 }
 
 
@@ -1480,6 +1609,7 @@ function getDisplayName(
     names[service] ||
     service
   );
+
 }
 
 
@@ -1496,6 +1626,7 @@ function closeCookieViewer() {
 
   cookieOutput.value =
     "";
+
 }
 
 
@@ -1921,6 +2052,418 @@ function updateHealthStatus(
       ? "connected"
       : "disconnected"
   );
+
+}
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG
+   ========================================================= */
+
+function setMultiMeldStatus(
+  text,
+  connected
+) {
+
+  if (
+    !multimeldStatus
+  ) {
+
+    return;
+
+  }
+
+
+  multimeldStatus.textContent =
+    text;
+
+
+  multimeldStatus.classList.remove(
+    "connected",
+    "disconnected"
+  );
+
+
+  multimeldStatus.classList.add(
+    connected
+      ? "connected"
+      : "disconnected"
+  );
+
+}
+
+
+function setMultiMeldAuthStatus(
+  text,
+  connected
+) {
+
+  if (
+    !multimeldAuthDisplay
+  ) {
+
+    return;
+
+  }
+
+
+  multimeldAuthDisplay.textContent =
+    text;
+
+
+  multimeldAuthDisplay.classList.remove(
+    "connected",
+    "disconnected"
+  );
+
+
+  multimeldAuthDisplay.classList.add(
+    connected
+      ? "connected"
+      : "disconnected"
+  );
+
+}
+
+
+function updateMultiMeldProfileVisibility() {
+
+  const isVod =
+    currentProfile ===
+    MULTIMELD_WATCHDOG_PROFILE;
+
+
+  if (
+    !multimeldWatchdogSection
+  ) {
+
+    return isVod;
+
+  }
+
+
+  multimeldWatchdogSection.classList.toggle(
+    "hidden",
+    !isVod
+  );
+
+
+  return isVod;
+
+}
+
+
+async function checkMultiMeldWatchdog(
+  showErrors = false
+) {
+
+  if (
+    !updateMultiMeldProfileVisibility()
+  ) {
+
+    return null;
+
+  }
+
+
+  if (
+    multimeldRefreshButton
+  ) {
+
+    multimeldRefreshButton.disabled =
+      true;
+
+
+    multimeldRefreshButton.textContent =
+      "Checking...";
+
+  }
+
+
+  setMultiMeldStatus(
+    "Checking",
+    false
+  );
+
+
+  setMultiMeldAuthStatus(
+    "Checking",
+    false
+  );
+
+
+  try {
+
+    const response =
+      await fetch(
+        MULTIMELD_WATCHDOG_STATUS_URL,
+        {
+          method:
+            "GET",
+
+          headers: {
+            "Accept":
+              "application/json"
+          },
+
+          cache:
+            "no-store"
+        }
+      );
+
+
+    let result = null;
+
+
+    try {
+
+      result =
+        await response.json();
+
+    } catch {
+
+      result = null;
+
+    }
+
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+        result?.error ||
+        `MultiMeld watchdog status failed (${response.status}).`
+      );
+
+    }
+
+
+    const auth =
+      result?.auth ||
+      null;
+
+
+    const reauthRequired =
+      Boolean(
+        result?.reauthorizationRequired ||
+        result?.authState?.reauthorizationRequired ||
+        auth?.reauthorizationRequired
+      );
+
+
+    const configured =
+      Boolean(
+        auth?.configured
+      );
+
+
+    const lastCheck =
+      result?.timestamp ||
+      result?.lastRun?.finishedAt ||
+      Date.now();
+
+
+    if (
+      multimeldLastCheck
+    ) {
+
+      multimeldLastCheck.textContent =
+        formatTimestamp(
+          lastCheck
+        );
+
+    }
+
+
+    if (
+      reauthRequired
+    ) {
+
+      setMultiMeldStatus(
+        "Reauthorization required",
+        false
+      );
+
+
+      setMultiMeldAuthStatus(
+        "Needs renewal",
+        false
+      );
+
+
+      if (
+        multimeldReauthWarning
+      ) {
+
+        multimeldReauthWarning.textContent =
+          "MultiMeld authentication needs to be renewed.";
+
+
+        multimeldReauthWarning.classList.remove(
+          "hidden"
+        );
+
+      }
+
+
+      return result;
+
+    }
+
+
+    if (
+      configured
+    ) {
+
+      setMultiMeldStatus(
+        "Connected",
+        true
+      );
+
+
+      setMultiMeldAuthStatus(
+        "Authenticated",
+        true
+      );
+
+
+      if (
+        multimeldReauthWarning
+      ) {
+
+        multimeldReauthWarning.classList.add(
+          "hidden"
+        );
+
+      }
+
+
+    } else {
+
+      setMultiMeldStatus(
+        "Not configured",
+        false
+      );
+
+
+      setMultiMeldAuthStatus(
+        "Not configured",
+        false
+      );
+
+
+      if (
+        multimeldReauthWarning
+      ) {
+
+        multimeldReauthWarning.textContent =
+          "MultiMeld authentication has not been configured.";
+
+
+        multimeldReauthWarning.classList.remove(
+          "hidden"
+        );
+
+      }
+
+    }
+
+
+    return result;
+
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[Cookie Sync] MultiMeld watchdog status failed:",
+      error
+    );
+
+
+    setMultiMeldStatus(
+      "Unavailable",
+      false
+    );
+
+
+    setMultiMeldAuthStatus(
+      "Unavailable",
+      false
+    );
+
+
+    if (
+      multimeldLastCheck
+    ) {
+
+      multimeldLastCheck.textContent =
+        formatTimestamp(
+          Date.now()
+        );
+
+    }
+
+
+    if (
+      multimeldReauthWarning
+    ) {
+
+      multimeldReauthWarning.textContent =
+        "Unable to check MultiMeld authentication right now.";
+
+
+      multimeldReauthWarning.classList.remove(
+        "hidden"
+      );
+
+    }
+
+
+    if (
+      showErrors
+    ) {
+
+      showMessage(
+        error.message,
+        "error"
+      );
+
+    }
+
+
+    return null;
+
+  } finally {
+
+    if (
+      multimeldRefreshButton
+    ) {
+
+      multimeldRefreshButton.disabled =
+        false;
+
+
+      multimeldRefreshButton.textContent =
+        "Check MultiMeld";
+
+    }
+
+  }
+}
+
+
+function openMultiMeld() {
+
+  chrome.tabs.create({
+
+    url:
+      "https://multi.meldstudio.co/"
+
+  });
+
 }
 
 
@@ -2034,6 +2577,7 @@ async function checkCloudflareHealth(
 
 
     return null;
+
   }
 }
 
@@ -2059,6 +2603,7 @@ function getHealthErrorLabel(
   ) {
 
     return "Unauthorized";
+
   }
 
 
@@ -2072,10 +2617,12 @@ function getHealthErrorLabel(
   ) {
 
     return "Unreachable";
+
   }
 
 
   return "Unavailable";
+
 }
 
 
@@ -2255,7 +2802,9 @@ async function syncSelectedToCloudflare() {
       "error"
     );
 
+
     return;
+
   }
 
 
@@ -2659,6 +3208,7 @@ function showMessage(
 
   messageElement.className =
     `message ${type}`.trim();
+
 }
 
 
@@ -2670,6 +3220,7 @@ function clearMessage() {
 
   messageElement.className =
     "message";
+
 }
 
 
@@ -2906,7 +3457,9 @@ viewerDownloadButton.addEventListener(
         "error"
       );
 
+
       return;
+
     }
 
 
@@ -2916,6 +3469,40 @@ viewerDownloadButton.addEventListener(
 
   }
 );
+
+
+/* ---------------------------------------------------------
+   MultiMeld watchdog
+   --------------------------------------------------------- */
+
+if (
+  multimeldRefreshButton
+) {
+
+  multimeldRefreshButton.addEventListener(
+    "click",
+    () => {
+
+      void checkMultiMeldWatchdog(
+        true
+      );
+
+    }
+  );
+
+}
+
+
+if (
+  multimeldOpenButton
+) {
+
+  multimeldOpenButton.addEventListener(
+    "click",
+    openMultiMeld
+  );
+
+}
 
 
 /* =========================================================
@@ -2929,6 +3516,16 @@ document.addEventListener(
     await loadStatus();
 
     await loadCloudConfig();
+
+
+    if (
+      currentProfile ===
+      MULTIMELD_WATCHDOG_PROFILE
+    ) {
+
+      await checkMultiMeldWatchdog();
+
+    }
 
 
     try {

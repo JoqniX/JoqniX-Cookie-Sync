@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "JoqniX Cookie Sync",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Sync complete browser cookie jars for JoqniX services.",
   "permissions": [
     "cookies",
     "storage",
     "downloads",
-    "alarms"
+    "alarms",
+    "notifications",
+    "scripting"
   ],
   "host_permissions": [
     "https://*.youtube.com/*",

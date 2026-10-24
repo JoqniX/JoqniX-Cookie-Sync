@@ -1012,5 +1012,130 @@ button:disabled {
   background: #211d2b;
   color: #ddd7ed;
 
-}
   border: 1px solid #342e40;
+}
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG
+   ========================================================= */
+
+.multimeld-watchdog-section {
+  margin-top: 14px;
+}
+
+.multimeld-watchdog-section.hidden {
+  display: none;
+}
+
+.multimeld-watchdog-status {
+  display: inline-block;
+
+  margin-top: 3px;
+
+  color: #858092;
+
+  font-size: 10px;
+}
+
+.multimeld-watchdog-status.connected {
+  color: #7ee787;
+}
+
+.multimeld-watchdog-status.warning {
+  color: #f0b36f;
+}
+
+.multimeld-watchdog-status.disconnected {
+  color: #f08888;
+}
+
+.multimeld-watchdog-auth {
+  margin-top: 8px;
+
+  padding: 8px 9px;
+
+  background: #0f0c16;
+
+  border: 1px solid #272230;
+  border-radius: 7px;
+
+  color: #aaa4b8;
+
+  font-size: 10px;
+
+  line-height: 1.45;
+}
+
+.multimeld-watchdog-auth.connected {
+  color: #7ee787;
+}
+
+.multimeld-watchdog-auth.warning {
+  color: #f0b36f;
+}
+
+.multimeld-watchdog-auth.disconnected {
+  color: #f08888;
+}
+
+.multimeld-reauth-warning {
+  margin-top: 8px;
+
+  padding: 8px 9px;
+
+  background: #211b16;
+
+  border: 1px solid #4a3828;
+  border-radius: 7px;
+
+  color: #f0b36f;
+
+  font-size: 10px;
+
+  line-height: 1.45;
+}
+
+.multimeld-reauth-warning.hidden {
+  display: none;
+}
+
+.multimeld-watchdog-meta {
+  margin-top: 7px;
+
+  color: #777181;
+
+  font-size: 9px;
+
+  line-height: 1.4;
+}
+
+.multimeld-watchdog-actions {
+  display: flex;
+
+  gap: 7px;
+
+  margin-top: 9px;
+}
+
+.multimeld-watchdog-actions button {
+  flex: 1;
+
+  margin-top: 0;
+}
+
+.multimeld-watchdog-actions .secondary {
+  background: #211d2b;
+  color: #ddd7ed;
+
+  border: 1px solid #342e40;
+}
+
+.multimeld-watchdog-actions .secondary:hover {
+  background: #2b2637;
+}
+
+.multimeld-watchdog-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

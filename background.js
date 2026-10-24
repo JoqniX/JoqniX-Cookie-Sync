@@ -16,12 +16,15 @@ const SUPPORTED_DOMAINS = [
   "casterlabs.co"
 ];
 
+
 const DEFAULT_PROFILE =
   "default";
+
 
 const DEFAULT_SELECTED_DOMAINS = [
   ...SUPPORTED_DOMAINS
 ];
+
 
 const DEFAULT_CONFIG = {
   workerUrl:
@@ -49,11 +52,77 @@ const DEFAULT_CONFIG = {
 const AUTOMATIC_SYNC_ALARM =
   "joqnix-cookie-sync";
 
+
 const AUTOMATIC_SYNC_PERIOD_MINUTES =
   30;
 
+
 const COOKIE_CHANGE_DEBOUNCE_MS =
   5000;
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG NOTIFICATIONS
+   ========================================================= */
+
+/*
+ * MultiMeld watchdog status endpoint.
+ *
+ * The extension only performs bootstrap from the VOD
+ * browser profile when MultiMeld reports that its stored
+ * Worker authentication needs reauthorization.
+ *
+ * The refresh token is read from MultiMeld page localStorage
+ * and sent directly to the Worker. It is never saved into
+ * extension storage and is never written to console logs.
+ */
+
+const MULTIMELD_WATCHDOG_STATUS_URL =
+  "https://api.joqnix.space/multistream-watchdog/status";
+
+
+const MULTIMELD_WATCHDOG_BOOTSTRAP_URL =
+  "https://api.joqnix.space/multistream-watchdog/auth/bootstrap";
+
+
+const MULTIMELD_WATCHDOG_ALARM =
+  "joqnix-multimeld-watchdog";
+
+
+const MULTIMELD_WATCHDOG_PERIOD_MINUTES =
+  5;
+
+
+const MULTIMELD_WATCHDOG_PROFILE =
+  "vod";
+
+
+const MULTIMELD_REAUTH_NOTIFICATION_ID =
+  "joqnix-multimeld-reauthorization";
+
+
+const MULTIMELD_REAUTH_DETECTED_AT_KEY =
+  "multimeldReauthDetectedAt";
+
+
+const MULTIMELD_REAUTH_REASON_KEY =
+  "multimeldReauthReason";
+
+
+const MULTIMELD_REAUTH_LAST_CHECK_KEY =
+  "multimeldWatchdogLastCheck";
+
+
+const MULTIMELD_REAUTH_LAST_STATUS_KEY =
+  "multimeldWatchdogLastStatus";
+
+
+const MULTIMELD_REAUTH_NOTIFICATION_TITLE =
+  "JoqniX MultiMeld Reauthorization Required";
+
+
+const MULTIMELD_REAUTH_NOTIFICATION_MESSAGE =
+  "MultiMeld authentication needs to be renewed in the VOD browser profile.";
 
 
 let syncTimer = null;
@@ -296,7 +365,7 @@ function serializeCookie(
       cookie.domain,
 
     path:
-      cookie.path,
+      cookie.path || "/",
 
     secure:
       cookie.secure,
@@ -698,6 +767,779 @@ async function getConfig() {
 
 
 /* =========================================================
+   MULTIMELD WATCHDOG
+   ========================================================= */
+
+async function isVodProfile() {
+  const config =
+    await getConfig();
+
+  return (
+    getProfile(
+      config.syncProfile
+    ) ===
+    MULTIMELD_WATCHDOG_PROFILE
+  );
+}
+
+
+async function fetchMultiMeldWatchdogStatus() {
+  const response =
+    await fetch(
+      MULTIMELD_WATCHDOG_STATUS_URL,
+      {
+        method:
+          "GET",
+
+        cache:
+          "no-store",
+
+        headers: {
+          "Accept":
+            "application/json"
+        }
+      }
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `MultiMeld watchdog status request failed (${response.status}).`
+    );
+  }
+
+  return await response.json();
+}
+
+
+/* =========================================================
+   MULTIMELD REFRESH TOKEN BOOTSTRAP
+   ========================================================= */
+
+/*
+ * Read the current MultiMeld refresh token from the active
+ * VOD browser tab.
+ *
+ * Important:
+ *
+ * - Only https://multi.meldstudio.co is accepted.
+ * - Only localStorage["kinde_refresh_token"] is read.
+ * - The token is returned to the service worker only long
+ *   enough to send it to the Cloudflare Worker.
+ * - The token is never saved to chrome.storage.
+ * - The token is never logged.
+ */
+
+async function getMultiMeldRefreshTokenFromActiveTab() {
+  /*
+   * Find an actual MultiMeld tab instead of assuming that
+   * the currently focused browser tab is MultiMeld.
+   *
+   * This is important because the VOD profile may have
+   * YouTube, Vivaldi settings, extensions pages, etc.
+   * focused when reauthorization is detected.
+   */
+
+  let tabs = [];
+
+  try {
+    tabs =
+      await chrome.tabs.query({
+        url: [
+          "https://multi.meldstudio.co/*"
+        ]
+      });
+  } catch (error) {
+    console.error(
+      "[MultiMeld Bootstrap] Failed to find MultiMeld tabs:",
+      error
+    );
+
+    return {
+      success:
+        false,
+
+      reason:
+        "multimeld_tab_query_failed"
+    };
+  }
+
+  if (
+    !Array.isArray(tabs) ||
+    tabs.length === 0
+  ) {
+    return {
+      success:
+        false,
+
+      reason:
+        "no_multimeld_tab"
+    };
+  }
+
+  /*
+   * Prefer:
+   *
+   * 1. A currently active MultiMeld tab.
+   * 2. A fully loaded MultiMeld tab.
+   * 3. Any remaining MultiMeld tab.
+   */
+
+  const sortedTabs =
+    [...tabs].sort(
+      (a, b) => {
+        const aScore =
+          (a.active ? 100 : 0) +
+          (a.status === "complete" ? 10 : 0);
+
+        const bScore =
+          (b.active ? 100 : 0) +
+          (b.status === "complete" ? 10 : 0);
+
+        return bScore - aScore;
+      }
+    );
+
+  for (
+    const tab of sortedTabs
+  ) {
+    if (
+      !tab?.id ||
+      typeof tab.url !==
+        "string"
+    ) {
+      continue;
+    }
+
+    /*
+     * Extra safety check.
+     *
+     * The query above should already restrict this,
+     * but we never inject into an unexpected origin.
+     */
+
+    let tabUrl;
+
+    try {
+      tabUrl =
+        new URL(
+          tab.url
+        );
+    } catch {
+      continue;
+    }
+
+    if (
+      tabUrl.origin !==
+      "https://multi.meldstudio.co"
+    ) {
+      continue;
+    }
+
+    try {
+      const results =
+        await chrome.scripting.executeScript({
+          target: {
+            tabId:
+              tab.id
+          },
+
+          func: () => {
+            try {
+              if (
+                location.origin !==
+                "https://multi.meldstudio.co"
+              ) {
+                return {
+                  success:
+                    false,
+
+                  reason:
+                    "not_multimeld_origin"
+                };
+              }
+
+              const refreshToken =
+                localStorage.getItem(
+                  "kinde_refresh_token"
+                );
+
+              if (
+                typeof refreshToken !==
+                  "string" ||
+                refreshToken.trim().length ===
+                  0
+              ) {
+                return {
+                  success:
+                    false,
+
+                  reason:
+                    "refresh_token_not_found"
+                };
+              }
+
+              return {
+                success:
+                  true,
+
+                refreshToken
+              };
+
+            } catch {
+              return {
+                success:
+                  false,
+
+                reason:
+                  "local_storage_read_failed"
+              };
+            }
+          }
+        });
+
+      const result =
+        results?.[0]?.result ??
+        null;
+
+      if (
+        result?.success &&
+        typeof result.refreshToken ===
+          "string" &&
+        result.refreshToken.trim().length >
+          0
+      ) {
+        console.log(
+          "[MultiMeld Bootstrap] Found a usable MultiMeld tab."
+        );
+
+        return {
+          success:
+            true,
+
+          refreshToken:
+            result.refreshToken.trim()
+        };
+      }
+
+      /*
+       * This tab is a valid MultiMeld page, but it does
+       * not currently contain the refresh token.
+       *
+       * Try another MultiMeld tab if one exists.
+       */
+
+      if (
+        result?.reason ===
+        "refresh_token_not_found"
+      ) {
+        continue;
+      }
+
+      if (
+        result?.reason ===
+        "local_storage_read_failed"
+      ) {
+        continue;
+      }
+
+    } catch (error) {
+      /*
+       * A particular MultiMeld tab may be in a state where
+       * script injection is temporarily unavailable.
+       *
+       * Do not abort the entire search. Try the next
+       * MultiMeld tab instead.
+       */
+
+      console.warn(
+        "[MultiMeld Bootstrap] Failed to inspect one MultiMeld tab:",
+        {
+          tabId:
+            tab.id,
+
+          error:
+            error?.message ??
+            String(error)
+        }
+      );
+    }
+  }
+
+  return {
+    success:
+      false,
+
+    reason:
+      "refresh_token_not_found"
+  };
+}
+
+/*
+ * Send the discovered refresh token to the Worker.
+ *
+ * The Worker is responsible for:
+ *
+ * 1. Testing the refresh token.
+ * 2. Obtaining an access token.
+ * 3. Validating /sessions/me.
+ * 4. Saving the working credentials.
+ * 5. Clearing the reauthorization state.
+ */
+
+async function bootstrapMultiMeldFromActiveTab() {
+  try {
+    const vodProfile =
+      await isVodProfile();
+
+    if (
+      !vodProfile
+    ) {
+      return {
+        success:
+          false,
+
+        skipped:
+          true,
+
+        reason:
+          "not_vod_profile"
+      };
+    }
+
+    const tokenResult =
+      await getMultiMeldRefreshTokenFromActiveTab();
+
+    if (
+      !tokenResult.success
+    ) {
+      return {
+        success:
+          false,
+
+        skipped:
+          false,
+
+        reason:
+          tokenResult.reason
+      };
+    }
+
+    const response =
+      await fetch(
+        MULTIMELD_WATCHDOG_BOOTSTRAP_URL,
+        {
+          method:
+            "POST",
+
+          cache:
+            "no-store",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            "Accept":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              refreshToken:
+                tokenResult.refreshToken
+            })
+        }
+      );
+
+    let payload =
+      null;
+
+    try {
+      payload =
+        await response.json();
+
+    } catch {
+      payload =
+        null;
+    }
+
+    if (
+      !response.ok
+    ) {
+      /*
+       * Never log the supplied refresh token.
+       */
+
+      console.warn(
+        "[MultiMeld Bootstrap] Bootstrap request failed:",
+        {
+          status:
+            response.status,
+
+          code:
+            payload?.code ??
+            payload?.error?.code ??
+            null
+        }
+      );
+
+      return {
+        success:
+          false,
+
+        skipped:
+          false,
+
+        status:
+          response.status,
+
+        code:
+          payload?.code ??
+          payload?.error?.code ??
+          null
+      };
+    }
+
+    console.log(
+      "[MultiMeld Bootstrap] Bootstrap succeeded.",
+      {
+        sessionId:
+          payload?.sessionId ??
+          null,
+
+        expiresAt:
+          payload?.expiresAt ??
+          null,
+
+        refreshTokenRotated:
+          payload?.refreshTokenRotated ??
+          false
+      }
+    );
+
+    await clearMultiMeldReauthState();
+
+    return {
+      success:
+        true,
+
+      skipped:
+        false,
+
+      status:
+        response.status,
+
+      sessionId:
+        payload?.sessionId ??
+        null,
+
+      expiresAt:
+        payload?.expiresAt ??
+        null,
+
+      refreshTokenRotated:
+        payload?.refreshTokenRotated ??
+        false
+    };
+
+  } catch (error) {
+
+    console.error(
+      "[MultiMeld Bootstrap] Bootstrap failed:",
+      error
+    );
+
+    return {
+      success:
+        false,
+
+      skipped:
+        false,
+
+      reason:
+        "bootstrap_request_failed"
+    };
+  }
+}
+
+
+/* =========================================================
+   MULTIMELD REAUTH STATE
+   ========================================================= */
+
+async function clearMultiMeldReauthState() {
+  await chrome.storage.local.remove([
+    MULTIMELD_REAUTH_DETECTED_AT_KEY,
+    MULTIMELD_REAUTH_REASON_KEY
+  ]);
+
+  try {
+    await chrome.notifications.clear(
+      MULTIMELD_REAUTH_NOTIFICATION_ID
+    );
+
+  } catch {
+    /*
+     * Notification may already be gone.
+     */
+  }
+}
+
+
+async function handleMultiMeldReauthorization(
+  auth
+) {
+  if (
+    !auth ||
+    auth.reauthorizationRequired !== true
+  ) {
+    await clearMultiMeldReauthState();
+    return;
+  }
+
+  const detectedAt =
+    auth.reauthorizationDetectedAt ??
+    null;
+
+  const reason =
+    auth.reauthorizationReason ??
+    "reauthorization_required";
+
+  const stored =
+    await chrome.storage.local.get([
+      MULTIMELD_REAUTH_DETECTED_AT_KEY,
+      MULTIMELD_REAUTH_REASON_KEY
+    ]);
+
+  const previouslyHandled =
+    detectedAt &&
+    stored[
+      MULTIMELD_REAUTH_DETECTED_AT_KEY
+    ] === detectedAt;
+
+  await chrome.storage.local.set({
+    [MULTIMELD_REAUTH_DETECTED_AT_KEY]:
+      detectedAt,
+
+    [MULTIMELD_REAUTH_REASON_KEY]:
+      reason
+  });
+
+  if (
+    previouslyHandled
+  ) {
+    return;
+  }
+
+  try {
+    await chrome.notifications.clear(
+      MULTIMELD_REAUTH_NOTIFICATION_ID
+    );
+
+  } catch {
+    /*
+     * Ignore notification-clear failures.
+     */
+  }
+
+  await chrome.notifications.create(
+    MULTIMELD_REAUTH_NOTIFICATION_ID,
+    {
+      type:
+        "basic",
+
+      iconUrl:
+        "icons/icon128.png",
+
+      title:
+        MULTIMELD_REAUTH_NOTIFICATION_TITLE,
+
+      message:
+        MULTIMELD_REAUTH_NOTIFICATION_MESSAGE,
+
+      priority:
+        2,
+
+      requireInteraction:
+        true
+    }
+  );
+
+  console.log(
+    "[MultiMeld Watchdog] Reauthorization notification shown:",
+    {
+      detectedAt,
+      reason
+    }
+  );
+}
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG CHECK
+   ========================================================= */
+
+async function checkMultiMeldWatchdog() {
+  try {
+    const vodProfile =
+      await isVodProfile();
+
+    if (
+      !vodProfile
+    ) {
+      return {
+        skipped:
+          true,
+
+        reason:
+          "not_vod_profile"
+      };
+    }
+
+    let result =
+      await fetchMultiMeldWatchdogStatus();
+
+    let auth =
+      result?.data?.auth ??
+      result?.auth ??
+      null;
+
+    let reauthorizationRequired =
+      auth?.reauthorizationRequired ===
+      true;
+
+    /*
+     * If the Worker says reauthorization is required,
+     * try to recover automatically from the VOD profile's
+     * currently active MultiMeld tab.
+     *
+     * The refresh token is read only from the page's
+     * localStorage and is never stored by the extension.
+     */
+
+    if (
+      reauthorizationRequired
+    ) {
+      const bootstrapResult =
+        await bootstrapMultiMeldFromActiveTab();
+
+      if (
+        bootstrapResult.success
+      ) {
+        try {
+          result =
+            await fetchMultiMeldWatchdogStatus();
+
+          auth =
+            result?.data?.auth ??
+            result?.auth ??
+            null;
+
+          reauthorizationRequired =
+            auth?.reauthorizationRequired ===
+            true;
+
+        } catch (error) {
+
+          console.error(
+            "[MultiMeld Watchdog] Status refresh after bootstrap failed:",
+            error
+          );
+        }
+      }
+    }
+
+    await chrome.storage.local.set({
+      [MULTIMELD_REAUTH_LAST_CHECK_KEY]:
+        Date.now(),
+
+      [MULTIMELD_REAUTH_LAST_STATUS_KEY]:
+        reauthorizationRequired
+          ? "reauthorization_required"
+          : "healthy"
+    });
+
+    await handleMultiMeldReauthorization(
+      auth
+    );
+
+    console.log(
+      "[MultiMeld Watchdog] Status checked:",
+      {
+        profile:
+          MULTIMELD_WATCHDOG_PROFILE,
+
+        reauthorizationRequired,
+
+        reason:
+          auth?.reauthorizationReason ??
+          null
+      }
+    );
+
+    return {
+      skipped:
+        false,
+
+      reauthorizationRequired,
+
+      reason:
+        auth?.reauthorizationReason ??
+        null,
+
+      detectedAt:
+        auth?.reauthorizationDetectedAt ??
+        null
+    };
+
+  } catch (error) {
+
+    /*
+     * Network failures must not create a reauthorization
+     * notification. They are not proof that OAuth expired.
+     */
+
+    console.error(
+      "[MultiMeld Watchdog] Status check failed:",
+      error
+    );
+
+    return {
+      skipped:
+        false,
+
+      error:
+        error.message
+    };
+  }
+}
+
+
+/* =========================================================
+   MULTIMELD WATCHDOG ALARM
+   ========================================================= */
+
+async function configureMultiMeldWatchdogAlarm() {
+  await chrome.alarms.clear(
+    MULTIMELD_WATCHDOG_ALARM
+  );
+
+  chrome.alarms.create(
+    MULTIMELD_WATCHDOG_ALARM,
+    {
+      periodInMinutes:
+        MULTIMELD_WATCHDOG_PERIOD_MINUTES
+    }
+  );
+
+  console.log(
+    `[MultiMeld Watchdog] Alarm enabled (${MULTIMELD_WATCHDOG_PERIOD_MINUTES} minutes).`
+  );
+}
+
+
+/* =========================================================
    CLOUDFLARE HEALTH CHECK
    ========================================================= */
 
@@ -1059,11 +1901,99 @@ function scheduleAutomaticCloudSync() {
 
 
 /* =========================================================
+   MULTIMELD TAB LOGIN / NAVIGATION HANDLER
+   ========================================================= */
+
+chrome.tabs.onUpdated.addListener(
+  async (
+    tabId,
+    changeInfo
+  ) => {
+
+    if (
+      changeInfo.status !==
+      "complete"
+    ) {
+      return;
+    }
+
+    try {
+
+      const vodProfile =
+        await isVodProfile();
+
+
+      if (
+        !vodProfile
+      ) {
+        return;
+      }
+
+
+      const tabs =
+        await chrome.tabs.query({
+          active:
+            true,
+
+          lastFocusedWindow:
+            true
+        });
+
+
+      const activeTab =
+        tabs?.[0] ??
+        null;
+
+
+      if (
+        !activeTab?.id ||
+        activeTab.id !== tabId
+      ) {
+        return;
+      }
+
+
+      if (
+        typeof activeTab.url !==
+          "string" ||
+        !activeTab.url.startsWith(
+          "https://multi.meldstudio.co/"
+        )
+      ) {
+        return;
+      }
+
+
+      await checkMultiMeldWatchdog();
+
+    } catch (error) {
+
+      console.error(
+        "[MultiMeld Bootstrap] Tab update handling failed:",
+        error
+      );
+    }
+  }
+);
+
+
+/* =========================================================
    ALARM HANDLER
    ========================================================= */
 
 chrome.alarms.onAlarm.addListener(
   async alarm => {
+
+    if (
+      alarm.name ===
+      MULTIMELD_WATCHDOG_ALARM
+    ) {
+
+      await checkMultiMeldWatchdog();
+
+      return;
+    }
+
 
     if (
       alarm.name !==
@@ -1092,7 +2022,6 @@ chrome.alarms.onAlarm.addListener(
 
 
       await syncToCloudflare();
-
 
     } catch (error) {
 
@@ -2476,13 +3405,15 @@ chrome.runtime.onStartup.addListener(
       "[Cookie Sync] Extension startup."
     );
 
-
     try {
 
       await saveCookieSnapshot();
 
       await configureAutomaticSyncAlarm();
 
+      await configureMultiMeldWatchdogAlarm();
+
+      await checkMultiMeldWatchdog();
 
     } catch (error) {
 
@@ -2491,7 +3422,6 @@ chrome.runtime.onStartup.addListener(
         error
       );
     }
-
   }
 );
 
@@ -2507,13 +3437,7 @@ chrome.runtime.onInstalled.addListener(
       `[Cookie Sync] Extension ${details.reason}`
     );
 
-
     try {
-
-      /*
-       * Initialize new configuration values
-       * without overwriting existing settings.
-       */
 
       const existing =
         await chrome.storage.local.get([
@@ -2541,11 +3465,8 @@ chrome.runtime.onInstalled.addListener(
 
 
       await chrome.storage.local.set({
-
         syncProfile,
-
         selectedDomains
-
       });
 
 
@@ -2553,6 +3474,9 @@ chrome.runtime.onInstalled.addListener(
 
       await configureAutomaticSyncAlarm();
 
+      await configureMultiMeldWatchdogAlarm();
+
+      await checkMultiMeldWatchdog();
 
     } catch (error) {
 
@@ -2561,7 +3485,34 @@ chrome.runtime.onInstalled.addListener(
         error
       );
     }
+  }
+);
 
+
+/* =========================================================
+   MULTIMELD NOTIFICATION CLICK
+   ========================================================= */
+
+chrome.notifications.onClicked.addListener(
+  notificationId => {
+
+    if (
+      notificationId !==
+      MULTIMELD_REAUTH_NOTIFICATION_ID
+    ) {
+      return;
+    }
+
+
+    chrome.tabs.create({
+      url:
+        "https://multi.meldstudio.co/"
+    });
+
+
+    chrome.notifications.clear(
+      MULTIMELD_REAUTH_NOTIFICATION_ID
+    );
   }
 );
 
@@ -2572,4 +3523,9 @@ chrome.runtime.onInstalled.addListener(
 
 console.log(
   "[Cookie Sync] Background service worker loaded."
+);
+
+
+console.log(
+  "[MultiMeld Watchdog] Background watchdog ready."
 );
